@@ -32,6 +32,17 @@ The `uvx` command is a convenient way to run Python packages directly without ex
 uvx /path/to/mcp-internet-speed-test
 ```
 
+### Option 2: Using docker
+
+```bash
+# Build the Docker image
+docker build -t mcp-internet-speed-test .
+
+# Run the MCP server in a Docker container
+docker run -it --rm -v $(pwd):/app -w /app mcp-internet-speed-test
+```
+
+
 ## Configuration
 
 To use this MCP server with Claude Desktop or other MCP clients, add it to your MCP configuration file.
@@ -43,10 +54,10 @@ Edit your Claude Desktop MCP configuration file:
 ```json
 {
     "mcpServers": {
-        "internet-speed-test": {
+        "mcp-internet-speed-test": {
             "command": "uvx",
             "args": [
-                "/path/to/mcp-internet-speed-test"
+                "/ABSOLUTE/PATH/TO/mcp-internet-speed-test"
             ]
         }
     }
