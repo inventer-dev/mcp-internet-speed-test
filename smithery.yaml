@@ -1,0 +1,33 @@
+# Smithery.ai configuration
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP
+    type: object
+    properties:
+      download_url:
+        type: string
+        description: "URL for download speed testing"
+        default: "http://ipv4.download.thinkbroadband.com/10MB.zip"
+      upload_url:
+        type: string
+        description: "URL for upload speed testing"
+        default: "https://httpbin.org/post"
+      latency_url:
+        type: string
+        description: "URL for latency testing"
+        default: "https://httpbin.org/get"
+    additionalProperties: false
+  commandFunction: |-
+    (config) => ({
+      "command": "python",
+      "args": [
+        "-m",
+        "main"
+      ],
+      "env": {
+        "DEFAULT_DOWNLOAD_URL": config.download_url || "http://ipv4.download.thinkbroadband.com/10MB.zip",
+        "DEFAULT_UPLOAD_URL": config.upload_url || "https://httpbin.org/post",
+        "DEFAULT_LATENCY_URL": config.latency_url || "https://httpbin.org/get"
+      }
+    })
