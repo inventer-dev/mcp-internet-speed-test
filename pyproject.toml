@@ -1,7 +1,18 @@
 [project]
-name = "mcp-internet-speed-test"
+name = "internet-speed-test"
 version = "0.1.0"
-description = "Add your description here"
+description = "Enables AI models and agents to perform internet speed measurements."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mcp[cli]>=1.6.0",
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+mcp-internet-speed-test = "main:mcp.run"
