@@ -4,14 +4,14 @@ WORKDIR /app
 
 # Install uv and uvx
 RUN pip install uv && \
-    uv pip install uvx && \
-    uvx setup
+    uv pip install --system uvx && \
+    uvx setup --skip-ensurepath || true
 
 # Copy requirements
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies using uv
-RUN uv pip install --no-cache-dir -e .
+RUN uv pip install --system --no-cache-dir -e .
 
 # Copy application code
 COPY . .
