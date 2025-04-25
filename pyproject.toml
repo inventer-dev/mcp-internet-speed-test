@@ -1,5 +1,5 @@
 [project]
-name = "internet-speed-test"
+name = "mcp-internet-speed-test"
 version = "0.1.0"
 description = "Enables AI models and agents to perform internet speed measurements."
 readme = "README.md"
