@@ -1,5 +1,27 @@
 """
 Server for the internet speed test
+
+This module implements an internet speed test service inspired by SpeedOf.Me methodology.
+
+## How It Works
+
+This speed test uses an incremental testing approach:
+
+### Download Test
+- Begins with downloading the smallest sample size (128 KB)
+- Gradually increases file size until download takes more than 8 seconds
+- Uses the last sample that took more than 8 seconds for final speed calculation
+
+### Upload Test
+- Similar incremental mechanism for uploads
+- Starts with a smaller sample file and gradually increases
+- Continues until upload takes more than 8 seconds
+
+### Test Method
+- Tests bandwidth in several passes with gradually increasing file sizes
+- Can measure a wide range of connection speeds (from 10 Kbps to 100+ Mbps)
+- Sample files sizes range from 128 KB to 512 MB
+
 """
 
 import time
@@ -11,62 +33,238 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("internet_speed_test", dependencies=["requests"])
 
 # Default URLs for testing
-DEFAULT_DOWNLOAD_URL = "http://ipv4.download.thinkbroadband.com/10MB.zip"
+# Using different file sizes from ThinkBroadband for download testing
+DEFAULT_DOWNLOAD_URLS = {
+    "128KB": "http://ipv4.download.thinkbroadband.com/128KB.zip",
+    "256KB": "http://ipv4.download.thinkbroadband.com/256KB.zip",
+    "512KB": "http://ipv4.download.thinkbroadband.com/512KB.zip",
+    "1MB": "http://ipv4.download.thinkbroadband.com/1MB.zip",
+    "2MB": "http://ipv4.download.thinkbroadband.com/2MB.zip",
+    "5MB": "http://ipv4.download.thinkbroadband.com/5MB.zip",
+    "10MB": "http://ipv4.download.thinkbroadband.com/10MB.zip",
+    "20MB": "http://ipv4.download.thinkbroadband.com/20MB.zip",
+    "40MB": "http://ipv4.download.thinkbroadband.com/40MB.zip",
+    "50MB": "http://ipv4.download.thinkbroadband.com/50MB.zip",
+    "100MB": "http://ipv4.download.thinkbroadband.com/100MB.zip",
+    "200MB": "http://ipv4.download.thinkbroadband.com/200MB.zip",
+    "512MB": "http://ipv4.download.thinkbroadband.com/512MB.zip",
+}
+
 DEFAULT_UPLOAD_URL = "https://httpbin.org/post"
 DEFAULT_LATENCY_URL = "https://httpbin.org/get"
+
+# File sizes in bytes for upload testing
+UPLOAD_SIZES = {
+    "128KB": 128 * 1024,
+    "256KB": 256 * 1024,
+    "512KB": 512 * 1024,
+    "1MB": 1 * 1024 * 1024,
+    "2MB": 2 * 1024 * 1024,
+    "5MB": 5 * 1024 * 1024,
+    "10MB": 10 * 1024 * 1024,
+    "20MB": 20 * 1024 * 1024,
+    "40MB": 40 * 1024 * 1024,
+    "50MB": 50 * 1024 * 1024,
+    "100MB": 100 * 1024 * 1024,
+    "200MB": 200 * 1024 * 1024,
+    "512MB": 512 * 1024 * 1024,
+}
+
+# Maximum time threshold for a test (in seconds)
+MAX_TEST_DURATION = 8.0
+
+# Size progression order
+SIZE_PROGRESSION = [
+    "128KB",
+    "256KB",
+    "512KB",
+    "1MB",
+    "2MB",
+    "5MB",
+    "10MB",
+    "20MB",
+    "40MB",
+    "50MB",
+    "100MB",
+    "200MB",
+    "512MB",
+]
 
 
 # Register tools
 @mcp.tool()
-def measure_download_speed(url_download: str = DEFAULT_DOWNLOAD_URL) -> dict:
-    """Measure the download speed"""
-    start = time.time()
+def measure_download_speed(size_limit: str = "100MB") -> dict:
+    """
+    Measure download speed using incremental file sizes.
 
-    response = requests.get(url_download, stream=True)
-    total_size = 0
+    Args:
+        size_limit: Maximum file size to test (default: 100MB)
 
-    for chunk in response.iter_content(chunk_size=1024):
-        if chunk:
-            total_size += len(chunk)
+    Returns:
+        Dictionary with download speed results
+    """
+    results = []
+    final_result = None
 
-    end = time.time()
-    elapsed_time = end - start
+    # Find the index of the size limit in our progression
+    max_index = (
+        SIZE_PROGRESSION.index(size_limit)
+        if size_limit in SIZE_PROGRESSION
+        else len(SIZE_PROGRESSION) - 1
+    )
 
-    speed_mbps = (total_size * 8) / (elapsed_time * 1_000_000)  # bits to megabits
+    # Test each file size in order, up to the specified limit
+    for size_key in SIZE_PROGRESSION[: max_index + 1]:
+        url = DEFAULT_DOWNLOAD_URLS[size_key]
+        #tracker = BandwidthTracker()
+
+        start = time.time()
+        response = requests.get(url, stream=True)
+        total_size = 0
+
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                chunk_size = len(chunk)
+                total_size += chunk_size
+                #tracker.update(chunk_size)
+
+        end = time.time()
+        elapsed_time = end - start
+
+        speed_mbps = (total_size * 8) / (elapsed_time * 1_000_000)  # bits to megabits
+        result = {
+            "size": size_key,
+            "download_speed": round(speed_mbps, 2),
+            "unit": "Mbps",
+            "elapsed_time": round(elapsed_time, 2),
+            "total_size": total_size,
+            "url": url,
+        }
+        results.append(result)
+
+        # Set the final result to the last result
+        final_result = result
+
+        # If this test took longer than our threshold, we're done
+        if elapsed_time > MAX_TEST_DURATION:
+            break
+
     return {
-        "download_speed": round(speed_mbps, 2),
+        "download_speed": final_result["download_speed"],
         "unit": "Mbps",
-        "elapsed_time": round(elapsed_time, 2),
-        "total_size": total_size,
-        "url": url_download,
+        "elapsed_time": final_result["elapsed_time"],
+        "total_size": final_result["total_size"],
+        "size_used": final_result["size"],
+        "all_tests": results,
     }
 
 
 @mcp.tool()
-def measure_upload_speed(url_upload: str = DEFAULT_UPLOAD_URL) -> dict:
-    """Measure the upload speed"""
-    data = b"x" * 10_000_000  # 10 MB of data
+def measure_upload_speed(
+    url_upload: str = DEFAULT_UPLOAD_URL, size_limit: str = "100MB"
+) -> dict:
+    """
+    Measure upload speed using incremental file sizes.
 
-    start = time.time()
-    response = requests.post(url_upload, files={"file": ("test.dat", data)})
-    end = time.time()
+    Args:
+        url_upload: URL to upload data to
+        size_limit: Maximum file size to test (default: 100MB)
 
-    if response.status_code == 200:
-        elapsed_time = end - start
-        speed_mbps = (len(data) * 8) / (elapsed_time * 1_000_000)  # bits to megabits
+    Returns:
+        Dictionary with upload speed results
+    """
+    results = []
+    final_result = None
+
+    # Find the index of the size limit in our progression
+    max_index = (
+        SIZE_PROGRESSION.index(size_limit)
+        if size_limit in SIZE_PROGRESSION
+        else len(SIZE_PROGRESSION) - 1
+    )
+
+    # Only test up to the specified size limit
+    for size_key in SIZE_PROGRESSION[: max_index + 1]:
+        # Skip larger sizes to avoid excessive resource usage in testing
+        if size_key in ["256MB", "512MB"]:
+            continue
+
+        data_size = UPLOAD_SIZES[size_key]
+        data = b"x" * data_size
+
+        #tracker = BandwidthTracker()
+
+        start = time.time()
+
+        try:
+            response = requests.post(
+                url_upload,
+                files={"file": ("test.dat", data)},
+                timeout=60,  # Timeout for very large files
+            )
+
+            end = time.time()
+            elapsed_time = end - start
+
+            if response.status_code == 200:
+                speed_mbps = (data_size * 8) / (
+                    elapsed_time * 1_000_000
+                )  # bits to megabits
+                result = {
+                    "size": size_key,
+                    "upload_speed": round(speed_mbps, 2),
+                    "unit": "Mbps",
+                    "elapsed_time": round(elapsed_time, 2),
+                    "data_size": data_size,
+                    "url": url_upload,
+                }
+
+                results.append(result)
+
+                # Set the final result to the last result
+                final_result = result
+
+                # If this test took longer than our threshold, we're done
+                if elapsed_time > MAX_TEST_DURATION:
+                    break
+            else:
+                results.append(
+                    {
+                        "size": size_key,
+                        "error": True,
+                        "message": f"HTTP Error: {response.status_code}",
+                        "url": url_upload,
+                    }
+                )
+                # If we encounter an error, use the last successful result or continue
+                if final_result:
+                    break
+
+        except Exception as e:
+            results.append(
+                {
+                    "size": size_key,
+                    "error": True,
+                    "message": f"Exception: {str(e)}",
+                    "url": url_upload,
+                }
+            )
+            # If we encounter an error, use the last successful result or continue
+            if final_result:
+                break
+
+    # Return the final result or an error if all tests failed
+    if final_result:
         return {
-            "upload_speed": round(speed_mbps, 2),
+            "upload_speed": final_result["upload_speed"],
             "unit": "Mbps",
-            "elapsed_time": round(elapsed_time, 2),
-            "data_size": len(data),
-            "url": url_upload,
+            "elapsed_time": final_result["elapsed_time"],
+            "data_size": final_result["data_size"],
+            "size_used": final_result["size"],
+            "all_tests": results,
         }
     else:
-        return {
-            "error": True,
-            "message": f"HTTP Error: {response.status_code}",
-            "url": url_upload,
-        }
+        return {"error": True, "message": "All upload tests failed", "details": results}
 
 
 @mcp.tool()
@@ -113,13 +311,29 @@ def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
 
 @mcp.tool()
 def run_complete_test(
-    url_download: str = DEFAULT_DOWNLOAD_URL,
+    max_size: str = "100MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
 ) -> dict:
-    """Run a complete speed test returning all metrics in a single call"""
-    download_result = measure_download_speed(url_download)
-    upload_result = measure_upload_speed(url_upload)
+    """
+    Run a complete speed test returning all metrics in a single call.
+
+    This test uses the smart incremental approach inspired by SpeedOf.Me:
+    - First measures download speed with gradually increasing file sizes
+    - Then measures upload speed with gradually increasing data sizes
+    - Measures latency and jitter
+    - Returns comprehensive results with real-time data
+
+    Args:
+        max_size: Maximum file size to test (default: 100MB)
+        url_upload: URL for upload testing
+        url_latency: URL for latency testing
+
+    Returns:
+        Complete test results including download, upload, latency and jitter metrics
+    """
+    download_result = measure_download_speed(max_size)
+    upload_result = measure_upload_speed(url_upload, max_size)
     latency_result = measure_latency(url_latency)
     jitter_result = measure_jitter(url_latency)
 
@@ -129,6 +343,7 @@ def run_complete_test(
         "upload": upload_result,
         "latency": latency_result,
         "jitter": jitter_result,
+        "test_methodology": "Incremental file size approach with 8-second threshold",
     }
 
 

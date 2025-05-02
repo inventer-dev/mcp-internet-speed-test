@@ -55,9 +55,12 @@ Edit your Claude Desktop MCP configuration file:
 {
     "mcpServers": {
         "mcp-internet-speed-test": {
-            "command": "uvx",
+            "command": "uv",
             "args": [
-                "/ABSOLUTE/PATH/TO/mcp-internet-speed-test"
+                "--directory",
+                "/ABSOLUTE/PATH/TO/mcp-internet-speed-test",
+                "run",
+                "main.py"
             ]
         }
     }
