@@ -84,7 +84,7 @@ If you're having issues connecting to the MCP server:
 1. Make sure the path in your MCP configuration is correct
 2. Check that you have the required permissions for the directory
 3. Verify Python 3.12+ is installed and in your PATH
-4. Ensure the `mcp[cli]` and `requests` packages are installed
+4. Ensure the `mcp[cli]` and `httpx` packages are installed
 
 ## Development
 

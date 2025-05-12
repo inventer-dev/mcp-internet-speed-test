@@ -25,12 +25,12 @@ This speed test uses an incremental testing approach:
 """
 
 import time
-import requests
+import httpx
 
 from mcp.server.fastmcp import FastMCP
 
 # Create a singleton instance of FastMCP
-mcp = FastMCP("internet_speed_test", dependencies=["requests"])
+mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
 
 # Default URLs for testing
 # Using different file sizes from ThinkBroadband for download testing
@@ -93,7 +93,7 @@ SIZE_PROGRESSION = [
 
 # Register tools
 @mcp.tool()
-def measure_download_speed(size_limit: str = "100MB") -> dict:
+async def measure_download_speed(size_limit: str = "100MB") -> dict:
     """
     Measure download speed using incremental file sizes.
 
@@ -114,40 +114,43 @@ def measure_download_speed(size_limit: str = "100MB") -> dict:
     )
 
     # Test each file size in order, up to the specified limit
-    for size_key in SIZE_PROGRESSION[: max_index + 1]:
-        url = DEFAULT_DOWNLOAD_URLS[size_key]
-        #tracker = BandwidthTracker()
+    async with httpx.AsyncClient() as client:
+        for size_key in SIZE_PROGRESSION[: max_index + 1]:
+            url = DEFAULT_DOWNLOAD_URLS[size_key]
+            # tracker = BandwidthTracker()
 
-        start = time.time()
-        response = requests.get(url, stream=True)
-        total_size = 0
+            start = time.time()
+            total_size = 0
 
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:
-                chunk_size = len(chunk)
-                total_size += chunk_size
-                #tracker.update(chunk_size)
+            async with client.stream("GET", url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=1024):
+                    if chunk:
+                        chunk_size = len(chunk)
+                        total_size += chunk_size
+                        # tracker.update(chunk_size)
 
-        end = time.time()
-        elapsed_time = end - start
+            end = time.time()
+            elapsed_time = end - start
 
-        speed_mbps = (total_size * 8) / (elapsed_time * 1_000_000)  # bits to megabits
-        result = {
-            "size": size_key,
-            "download_speed": round(speed_mbps, 2),
-            "unit": "Mbps",
-            "elapsed_time": round(elapsed_time, 2),
-            "total_size": total_size,
-            "url": url,
-        }
-        results.append(result)
+            speed_mbps = (total_size * 8) / (
+                elapsed_time * 1_000_000
+            )  # bits to megabits
+            result = {
+                "size": size_key,
+                "download_speed": round(speed_mbps, 2),
+                "unit": "Mbps",
+                "elapsed_time": round(elapsed_time, 2),
+                "total_size": total_size,
+                "url": url,
+            }
+            results.append(result)
 
-        # Set the final result to the last result
-        final_result = result
+            # Set the final result to the last result
+            final_result = result
 
-        # If this test took longer than our threshold, we're done
-        if elapsed_time > MAX_TEST_DURATION:
-            break
+            # If this test took longer than our threshold, we're done
+            if elapsed_time > MAX_TEST_DURATION:
+                break
 
     return {
         "download_speed": final_result["download_speed"],
@@ -160,7 +163,7 @@ def measure_download_speed(size_limit: str = "100MB") -> dict:
 
 
 @mcp.tool()
-def measure_upload_speed(
+async def measure_upload_speed(
     url_upload: str = DEFAULT_UPLOAD_URL, size_limit: str = "100MB"
 ) -> dict:
     """
@@ -184,74 +187,75 @@ def measure_upload_speed(
     )
 
     # Only test up to the specified size limit
-    for size_key in SIZE_PROGRESSION[: max_index + 1]:
-        # Skip larger sizes to avoid excessive resource usage in testing
-        if size_key in ["256MB", "512MB"]:
-            continue
+    async with httpx.AsyncClient() as client:
+        for size_key in SIZE_PROGRESSION[: max_index + 1]:
+            # Skip larger sizes to avoid excessive resource usage in testing
+            if size_key in ["256MB", "512MB"]:
+                continue
 
-        data_size = UPLOAD_SIZES[size_key]
-        data = b"x" * data_size
+            data_size = UPLOAD_SIZES[size_key]
+            data = b"x" * data_size
 
-        #tracker = BandwidthTracker()
+            # tracker = BandwidthTracker()
 
-        start = time.time()
+            start = time.time()
 
-        try:
-            response = requests.post(
-                url_upload,
-                files={"file": ("test.dat", data)},
-                timeout=60,  # Timeout for very large files
-            )
+            try:
+                response = await client.post(
+                    url_upload,
+                    files={"file": ("test.dat", data)},
+                    timeout=60.0,  # Timeout for very large files
+                )
 
-            end = time.time()
-            elapsed_time = end - start
+                end = time.time()
+                elapsed_time = end - start
 
-            if response.status_code == 200:
-                speed_mbps = (data_size * 8) / (
-                    elapsed_time * 1_000_000
-                )  # bits to megabits
-                result = {
-                    "size": size_key,
-                    "upload_speed": round(speed_mbps, 2),
-                    "unit": "Mbps",
-                    "elapsed_time": round(elapsed_time, 2),
-                    "data_size": data_size,
-                    "url": url_upload,
-                }
+                if response.status_code == 200:
+                    speed_mbps = (data_size * 8) / (
+                        elapsed_time * 1_000_000
+                    )  # bits to megabits
+                    result = {
+                        "size": size_key,
+                        "upload_speed": round(speed_mbps, 2),
+                        "unit": "Mbps",
+                        "elapsed_time": round(elapsed_time, 2),
+                        "data_size": data_size,
+                        "url": url_upload,
+                    }
 
-                results.append(result)
+                    results.append(result)
 
-                # Set the final result to the last result
-                final_result = result
+                    # Set the final result to the last result
+                    final_result = result
 
-                # If this test took longer than our threshold, we're done
-                if elapsed_time > MAX_TEST_DURATION:
-                    break
-            else:
+                    # If this test took longer than our threshold, we're done
+                    if elapsed_time > MAX_TEST_DURATION:
+                        break
+                else:
+                    results.append(
+                        {
+                            "size": size_key,
+                            "error": True,
+                            "message": f"HTTP Error: {response.status_code}",
+                            "url": url_upload,
+                        }
+                    )
+                    # If we encounter an error, use the last successful result or continue
+                    if final_result:
+                        break
+
+            except Exception as e:
                 results.append(
                     {
                         "size": size_key,
                         "error": True,
-                        "message": f"HTTP Error: {response.status_code}",
+                        "message": f"Exception: {str(e)}",
                         "url": url_upload,
                     }
                 )
                 # If we encounter an error, use the last successful result or continue
                 if final_result:
                     break
-
-        except Exception as e:
-            results.append(
-                {
-                    "size": size_key,
-                    "error": True,
-                    "message": f"Exception: {str(e)}",
-                    "url": url_upload,
-                }
-            )
-            # If we encounter an error, use the last successful result or continue
-            if final_result:
-                break
 
     # Return the final result or an error if all tests failed
     if final_result:
@@ -268,10 +272,11 @@ def measure_upload_speed(
 
 
 @mcp.tool()
-def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
+async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
     """Measure the latency"""
     start = time.time()
-    response = requests.get(url)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
     end = time.time()
     elapsed_time = end - start
     return {
@@ -282,15 +287,16 @@ def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
 
 
 @mcp.tool()
-def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
+async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
     """Jitter is the variation in latency, so we need multiple measurements."""
     latency_values = []
 
-    for _ in range(samples):
-        start = time.time()
-        response = requests.get(url)
-        end = time.time()
-        latency_values.append((end - start) * 1000)  # Convert to milliseconds
+    async with httpx.AsyncClient() as client:
+        for _ in range(samples):
+            start = time.time()
+            response = await client.get(url)
+            end = time.time()
+            latency_values.append((end - start) * 1000)  # Convert to milliseconds
 
     # Calculate average latency
     avg_latency = sum(latency_values) / len(latency_values)
@@ -310,7 +316,7 @@ def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
 
 
 @mcp.tool()
-def run_complete_test(
+async def run_complete_test(
     max_size: str = "100MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
@@ -332,10 +338,10 @@ def run_complete_test(
     Returns:
         Complete test results including download, upload, latency and jitter metrics
     """
-    download_result = measure_download_speed(max_size)
-    upload_result = measure_upload_speed(url_upload, max_size)
-    latency_result = measure_latency(url_latency)
-    jitter_result = measure_jitter(url_latency)
+    download_result = await measure_download_speed(max_size)
+    upload_result = await measure_upload_speed(url_upload, max_size)
+    latency_result = await measure_latency(url_latency)
+    jitter_result = await measure_jitter(url_latency)
 
     return {
         "timestamp": time.time(),
