@@ -33,21 +33,34 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
 
 # Default URLs for testing
-# Using different file sizes from ThinkBroadband for download testing
+# Using jsDelivr CDN for faster and more reliable file delivery
+# Format: https://cdn.jsdelivr.net/gh/USERNAME/REPO@BRANCH/path/to/file
+# Replace with your actual GitHub username and repository
+
+# INSTRUCTIONS:
+# 1. Upload the test_files/*.bin files to a public GitHub repository
+# 2. Replace 'tu-usuario/speed-test-files' with your actual GitHub username and repo name
+# 3. Ensure the branch name (default: main) matches your repository's default branch
+
+GITHUB_USERNAME = "inventer-dev"  # Replace with your GitHub username
+GITHUB_REPO = "mcp-internet-speed-test"  # Replace with your repository name
+GITHUB_BRANCH = "main"  # Replace with your branch name (main or master)
+
+# Build base URL for jsDelivr CDN
+JSDELIVR_BASE_URL = f"https://cdn.jsdelivr.net/gh/{GITHUB_USERNAME}/{GITHUB_REPO}@{GITHUB_BRANCH}"
+
 DEFAULT_DOWNLOAD_URLS = {
-    "128KB": "http://ipv4.download.thinkbroadband.com/128KB.zip",
-    "256KB": "http://ipv4.download.thinkbroadband.com/256KB.zip",
-    "512KB": "http://ipv4.download.thinkbroadband.com/512KB.zip",
-    "1MB": "http://ipv4.download.thinkbroadband.com/1MB.zip",
-    "2MB": "http://ipv4.download.thinkbroadband.com/2MB.zip",
-    "5MB": "http://ipv4.download.thinkbroadband.com/5MB.zip",
-    "10MB": "http://ipv4.download.thinkbroadband.com/10MB.zip",
-    "20MB": "http://ipv4.download.thinkbroadband.com/20MB.zip",
-    "40MB": "http://ipv4.download.thinkbroadband.com/40MB.zip",
-    "50MB": "http://ipv4.download.thinkbroadband.com/50MB.zip",
-    "100MB": "http://ipv4.download.thinkbroadband.com/100MB.zip",
-    "200MB": "http://ipv4.download.thinkbroadband.com/200MB.zip",
-    "512MB": "http://ipv4.download.thinkbroadband.com/512MB.zip",
+    "128KB": f"{JSDELIVR_BASE_URL}/128KB.bin",
+    "256KB": f"{JSDELIVR_BASE_URL}/256KB.bin",
+    "512KB": f"{JSDELIVR_BASE_URL}/512KB.bin",
+    "1MB": f"{JSDELIVR_BASE_URL}/1MB.bin",
+    "2MB": f"{JSDELIVR_BASE_URL}/2MB.bin",
+    "5MB": f"{JSDELIVR_BASE_URL}/5MB.bin",
+    "10MB": f"{JSDELIVR_BASE_URL}/10MB.bin",
+    "20MB": f"{JSDELIVR_BASE_URL}/20MB.bin",
+    "40MB": f"{JSDELIVR_BASE_URL}/40MB.bin",
+    "50MB": f"{JSDELIVR_BASE_URL}/50MB.bin",
+    "100MB": f"{JSDELIVR_BASE_URL}/100MB.bin"
 }
 
 DEFAULT_UPLOAD_URL = "https://httpbin.org/post"
@@ -66,8 +79,6 @@ UPLOAD_SIZES = {
     "40MB": 40 * 1024 * 1024,
     "50MB": 50 * 1024 * 1024,
     "100MB": 100 * 1024 * 1024,
-    "200MB": 200 * 1024 * 1024,
-    "512MB": 512 * 1024 * 1024,
 }
 
 # Maximum time threshold for a test (in seconds)
@@ -86,8 +97,6 @@ SIZE_PROGRESSION = [
     "40MB",
     "50MB",
     "100MB",
-    "200MB",
-    "512MB",
 ]
 
 
