@@ -43,7 +43,7 @@ mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
 # 3. Ensure the branch name (default: main) matches your repository's default branch
 
 GITHUB_USERNAME = "inventer-dev"  # Replace with your GitHub username
-GITHUB_REPO = "mcp-internet-speed-test"  # Replace with your repository name
+GITHUB_REPO = "speed-test-files"  # Replace with your repository name
 GITHUB_BRANCH = "main"  # Replace with your branch name (main or master)
 
 # Build base URL for jsDelivr CDN
@@ -58,9 +58,6 @@ DEFAULT_DOWNLOAD_URLS = {
     "5MB": f"{JSDELIVR_BASE_URL}/5MB.bin",
     "10MB": f"{JSDELIVR_BASE_URL}/10MB.bin",
     "20MB": f"{JSDELIVR_BASE_URL}/20MB.bin",
-    "40MB": f"{JSDELIVR_BASE_URL}/40MB.bin",
-    "50MB": f"{JSDELIVR_BASE_URL}/50MB.bin",
-    "100MB": f"{JSDELIVR_BASE_URL}/100MB.bin"
 }
 
 DEFAULT_UPLOAD_URL = "https://httpbin.org/post"
