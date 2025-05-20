@@ -33,31 +33,27 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
 
 # Default URLs for testing
-# Using jsDelivr CDN for faster and more reliable file delivery
-# Format: https://cdn.jsdelivr.net/gh/USERNAME/REPO@BRANCH/path/to/file
-# Replace with your actual GitHub username and repository
-
-# INSTRUCTIONS:
-# 1. Upload the test_files/*.bin files to a public GitHub repository
-# 2. Replace 'tu-usuario/speed-test-files' with your actual GitHub username and repo name
-# 3. Ensure the branch name (default: main) matches your repository's default branch
-
 GITHUB_USERNAME = "inventer-dev"  # Replace with your GitHub username
 GITHUB_REPO = "speed-test-files"  # Replace with your repository name
 GITHUB_BRANCH = "main"  # Replace with your branch name (main or master)
 
-# Build base URL for jsDelivr CDN
-JSDELIVR_BASE_URL = f"https://cdn.jsdelivr.net/gh/{GITHUB_USERNAME}/{GITHUB_REPO}@{GITHUB_BRANCH}"
+# Build base URL for GitHub raw content
+GITHUB_RAW_URL = (
+    f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/{GITHUB_BRANCH}"
+)
 
 DEFAULT_DOWNLOAD_URLS = {
-    "128KB": f"{JSDELIVR_BASE_URL}/128KB.bin",
-    "256KB": f"{JSDELIVR_BASE_URL}/256KB.bin",
-    "512KB": f"{JSDELIVR_BASE_URL}/512KB.bin",
-    "1MB": f"{JSDELIVR_BASE_URL}/1MB.bin",
-    "2MB": f"{JSDELIVR_BASE_URL}/2MB.bin",
-    "5MB": f"{JSDELIVR_BASE_URL}/5MB.bin",
-    "10MB": f"{JSDELIVR_BASE_URL}/10MB.bin",
-    "20MB": f"{JSDELIVR_BASE_URL}/20MB.bin",
+    "128KB": f"{GITHUB_RAW_URL}/128KB.bin",
+    "256KB": f"{GITHUB_RAW_URL}/256KB.bin",
+    "512KB": f"{GITHUB_RAW_URL}/512KB.bin",
+    "1MB": f"{GITHUB_RAW_URL}/1MB.bin",
+    "2MB": f"{GITHUB_RAW_URL}/2MB.bin",
+    "5MB": f"{GITHUB_RAW_URL}/5MB.bin",
+    "10MB": f"{GITHUB_RAW_URL}/10MB.bin",
+    "20MB": f"{GITHUB_RAW_URL}/20MB.bin",
+    "40MB": f"{GITHUB_RAW_URL}/40MB.bin",
+    "50MB": f"{GITHUB_RAW_URL}/50MB.bin",
+    "100MB": f"{GITHUB_RAW_URL}/100MB.bin",
 }
 
 DEFAULT_UPLOAD_URL = "https://httpbin.org/post"
@@ -79,7 +75,8 @@ UPLOAD_SIZES = {
 }
 
 # Maximum time threshold for a test (in seconds)
-MAX_TEST_DURATION = 8.0
+BASE_TEST_DURATION = 8.0
+ADDITIONAL_TEST_DURATION = 4.0
 
 # Size progression order
 SIZE_PROGRESSION = [
@@ -122,18 +119,26 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
     # Test each file size in order, up to the specified limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
-            url = DEFAULT_DOWNLOAD_URLS[size_key]
-            # tracker = BandwidthTracker()
+            if size_key in DEFAULT_DOWNLOAD_URLS:
+                if size_key in ["100MB", "200MB", "500MB", "1GB"]:
+                    test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+                else:
+                    test_duration = BASE_TEST_DURATION
 
-            start = time.time()
-            total_size = 0
+                url = DEFAULT_DOWNLOAD_URLS[size_key]
+                start = time.time()
+                total_size = 0
 
-            async with client.stream("GET", url) as response:
-                async for chunk in response.aiter_bytes(chunk_size=1024):
-                    if chunk:
-                        chunk_size = len(chunk)
-                        total_size += chunk_size
-                        # tracker.update(chunk_size)
+                async with client.stream(
+                    "GET", url,
+                ) as response:
+                    async for chunk in response.aiter_bytes(chunk_size=1024):
+                        if chunk:
+                            chunk_size = len(chunk)
+                            total_size += chunk_size
+            else:
+                # Skip sizes that don't have a corresponding URL
+                continue
 
             end = time.time()
             elapsed_time = end - start
@@ -155,7 +160,7 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
             final_result = result
 
             # If this test took longer than our threshold, we're done
-            if elapsed_time > MAX_TEST_DURATION:
+            if elapsed_time > test_duration:
                 break
 
     return {
@@ -195,15 +200,13 @@ async def measure_upload_speed(
     # Only test up to the specified size limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
-            # Skip larger sizes to avoid excessive resource usage in testing
-            if size_key in ["256MB", "512MB"]:
-                continue
+            if size_key in ["100MB", "200MB", "500MB", "1GB"]:
+                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+            else:
+                test_duration = BASE_TEST_DURATION
 
             data_size = UPLOAD_SIZES[size_key]
             data = b"x" * data_size
-
-            # tracker = BandwidthTracker()
-
             start = time.time()
 
             try:
@@ -235,7 +238,7 @@ async def measure_upload_speed(
                     final_result = result
 
                     # If this test took longer than our threshold, we're done
-                    if elapsed_time > MAX_TEST_DURATION:
+                    if elapsed_time > test_duration:
                         break
                 else:
                     results.append(
