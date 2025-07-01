@@ -25,8 +25,10 @@ This speed test uses an incremental testing approach:
 """
 
 import time
-import httpx
+import re
+from typing import Dict, Optional
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 
 # Create a singleton instance of FastMCP
@@ -56,8 +58,55 @@ DEFAULT_DOWNLOAD_URLS = {
     "100MB": f"{GITHUB_RAW_URL}/100MB.bin",
 }
 
-DEFAULT_UPLOAD_URL = "https://httpbin.org/post"
-DEFAULT_LATENCY_URL = "https://httpbin.org/get"
+# Distributed upload endpoints for geographic diversity
+DISTRIBUTED_UPLOAD_ENDPOINTS = [
+    {
+        "url": "https://httpi.dev/",
+        "name": "Cloudflare Workers (Global)",
+        "provider": "Cloudflare",
+        "priority": 1  # Highest priority due to global distribution
+    },
+    {
+        "url": "https://httpbin.org/", 
+        "name": "HTTPBin (AWS)",
+        "provider": "AWS",
+        "priority": 2
+    },
+    {
+        "url": "https://httpbun.com/",
+        "name": "HTTPBun (Primary)", 
+        "provider": "Independent",
+        "priority": 3
+    },
+    {
+        "url": "https://ant.httpbun.com/",
+        "name": "HTTPBun Ant",
+        "provider": "Independent", 
+        "priority": 4
+    },
+    {
+        "url": "https://bat.httpbun.com/",
+        "name": "HTTPBun Bat",
+        "provider": "Independent",
+        "priority": 5
+    },
+    {
+        "url": "https://cat.httpbun.com/",
+        "name": "HTTPBun Cat",
+        "provider": "Independent",
+        "priority": 6
+    },
+    {
+        "url": "https://dog.httpbun.com/", 
+        "name": "HTTPBun Dog",
+        "provider": "Independent",
+        "priority": 7
+    }
+]
+
+# Primary endpoints for backward compatibility
+DEFAULT_UPLOAD_URL = DISTRIBUTED_UPLOAD_ENDPOINTS[0]["url"] + "post" # Use Cloudflare by default
+DEFAULT_LATENCY_URL = DISTRIBUTED_UPLOAD_ENDPOINTS[0]["url"] + "get" # Use Cloudflare by default
 
 # File sizes in bytes for upload testing
 UPLOAD_SIZES = {
@@ -93,8 +142,324 @@ SIZE_PROGRESSION = [
     "100MB",
 ]
 
+# Server location mapping based on Fastly POP codes
+FASTLY_POP_LOCATIONS = {
+    "MEX": "Mexico City, Mexico",
+    "QRO": "Querétaro, Mexico",
+    "DFW": "Dallas, Texas, USA",
+    "LAX": "Los Angeles, California, USA",
+    "NYC": "New York City, New York, USA",
+    "MIA": "Miami, Florida, USA",
+    "LHR": "London, United Kingdom",
+    "FRA": "Frankfurt, Germany",
+    "AMS": "Amsterdam, Netherlands",
+    "CDG": "Paris, France",
+    "NRT": "Tokyo, Japan",
+    "SIN": "Singapore",
+    "SYD": "Sydney, Australia",
+    "GRU": "São Paulo, Brazil",
+    "SCL": "Santiago, Chile",
+    "BOG": "Bogotá, Colombia",
+    "MAD": "Madrid, Spain",
+    "MIL": "Milan, Italy",
+    "STO": "Stockholm, Sweden",
+    "CPH": "Copenhagen, Denmark",
+    "ZUR": "Zurich, Switzerland",
+    "VIE": "Vienna, Austria",
+    "WAW": "Warsaw, Poland",
+    "PRG": "Prague, Czech Republic",
+    "BUD": "Budapest, Hungary",
+    "ATH": "Athens, Greece",
+    "IST": "Istanbul, Turkey",
+    "DXB": "Dubai, UAE",
+    "BOM": "Mumbai, India",
+    "DEL": "New Delhi, India",
+    "ICN": "Seoul, South Korea",
+    "HKG": "Hong Kong",
+    "TPE": "Taipei, Taiwan",
+    "KUL": "Kuala Lumpur, Malaysia",
+    "BKK": "Bangkok, Thailand",
+    "CGK": "Jakarta, Indonesia",
+    "MNL": "Manila, Philippines",
+    "PER": "Perth, Australia",
+    "AKL": "Auckland, New Zealand",
+    "JNB": "Johannesburg, South Africa",
+    "CPT": "Cape Town, South Africa",
+    "CAI": "Cairo, Egypt",
+    "LOS": "Lagos, Nigeria",
+    "NBO": "Nairobi, Kenya",
+    "YYZ": "Toronto, Canada",
+    "YVR": "Vancouver, Canada",
+    "GIG": "Rio de Janeiro, Brazil",
+    "LIM": "Lima, Peru",
+    "UIO": "Quito, Ecuador",
+    "CCS": "Caracas, Venezuela",
+    "PTY": "Panama City, Panama",
+    "SJO": "San José, Costa Rica",
+    "GUA": "Guatemala City, Guatemala",
+    "SDQ": "Santo Domingo, Dominican Republic",
+    "SJU": "San Juan, Puerto Rico"
+}
+
+# Cloudflare data center locations mapping
+CLOUDFLARE_POP_LOCATIONS = {
+    "DFW": "Dallas, Texas, USA",
+    "LAX": "Los Angeles, California, USA", 
+    "SJC": "San Jose, California, USA",
+    "SEA": "Seattle, Washington, USA",
+    "ORD": "Chicago, Illinois, USA",
+    "MCI": "Kansas City, Missouri, USA",
+    "ATL": "Atlanta, Georgia, USA",
+    "MIA": "Miami, Florida, USA",
+    "EWR": "Newark, New Jersey, USA",
+    "IAD": "Washington, D.C., USA",
+    "YYZ": "Toronto, Canada",
+    "YVR": "Vancouver, Canada",
+    "LHR": "London, United Kingdom",
+    "CDG": "Paris, France",
+    "FRA": "Frankfurt, Germany",
+    "AMS": "Amsterdam, Netherlands",
+    "ARN": "Stockholm, Sweden",
+    "CPH": "Copenhagen, Denmark",
+    "OSL": "Oslo, Norway",
+    "HEL": "Helsinki, Finland",
+    "WAW": "Warsaw, Poland",
+    "PRG": "Prague, Czech Republic",
+    "VIE": "Vienna, Austria",
+    "ZUR": "Zurich, Switzerland",
+    "MIL": "Milan, Italy", 
+    "FCO": "Rome, Italy",
+    "MAD": "Madrid, Spain",
+    "BCN": "Barcelona, Spain",
+    "LIS": "Lisbon, Portugal",
+    "ATH": "Athens, Greece",
+    "IST": "Istanbul, Turkey",
+    "SVO": "Moscow, Russia",
+    "LED": "St. Petersburg, Russia",
+    "HKG": "Hong Kong",
+    "NRT": "Tokyo, Japan",
+    "KIX": "Osaka, Japan",
+    "ICN": "Seoul, South Korea",
+    "PVG": "Shanghai, China",
+    "PEK": "Beijing, China",
+    "SIN": "Singapore",
+    "KUL": "Kuala Lumpur, Malaysia",
+    "BKK": "Bangkok, Thailand",
+    "CGK": "Jakarta, Indonesia",
+    "MNL": "Manila, Philippines",
+    "SYD": "Sydney, Australia",
+    "MEL": "Melbourne, Australia",
+    "PER": "Perth, Australia",
+    "AKL": "Auckland, New Zealand",
+    "BOM": "Mumbai, India",
+    "DEL": "New Delhi, India",
+    "BLR": "Bangalore, India",
+    "MAA": "Chennai, India",
+    "DXB": "Dubai, UAE",
+    "DOH": "Doha, Qatar",
+    "KWI": "Kuwait City, Kuwait",
+    "JNB": "Johannesburg, South Africa",
+    "CPT": "Cape Town, South Africa",
+    "LAD": "Luanda, Angola",
+    "CAI": "Cairo, Egypt",
+    "LOS": "Lagos, Nigeria",
+    "NBO": "Nairobi, Kenya",
+    "GRU": "São Paulo, Brazil",
+    "GIG": "Rio de Janeiro, Brazil",
+    "FOR": "Fortaleza, Brazil",
+    "SCL": "Santiago, Chile",
+    "LIM": "Lima, Peru",
+    "BOG": "Bogotá, Colombia",
+    "UIO": "Quito, Ecuador",
+    "PTY": "Panama City, Panama",
+    "SJO": "San José, Costa Rica",
+    "MEX": "Mexico City, Mexico",
+    "QRO": "Querétaro, Mexico",
+}
+
+
+def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
+    """
+    Extract server information from HTTP headers.
+    
+    Args:
+        headers: HTTP response headers
+        
+    Returns:
+        Dictionary with server information including POP location, CDN info, etc.
+    """
+    server_info = {
+        "cdn_provider": None,
+        "pop_code": None,
+        "pop_location": None,
+        "served_by": None,
+        "via_header": None,
+        "cache_status": None,
+        "server_ip_info": None,
+        "x_cache": None
+    }
+
+    # Extract x-served-by header (Fastly specific)
+    served_by = headers.get("x-served-by", "")
+    if served_by:
+        server_info["served_by"] = served_by
+
+        # Extract POP code from served-by header
+        # Format examples: cache-mex4329-MEX, cache-qro4141-QRO, cache-dfw-kdfw8210052-DFW
+        pop_match = re.search(r'-([A-Z]{3})$', served_by)
+        if pop_match:
+            server_info["pop_code"] = pop_match.group(1)
+            server_info["pop_location"] = FASTLY_POP_LOCATIONS.get(
+                pop_match.group(1), f"Unknown location ({pop_match.group(1)})"
+            )
+            server_info["cdn_provider"] = "Fastly"
+
+    # Extract via header
+    via = headers.get("via", "")
+    if via:
+        server_info["via_header"] = via
+
+    # Extract cache status
+    cache_status = headers.get("x-cache", "")
+    if cache_status:
+        server_info["x_cache"] = cache_status
+        server_info["cache_status"] = "HIT" if "HIT" in cache_status.upper() else "MISS"
+
+    # Extract Cloudflare CF-Ray header
+    cf_ray = headers.get("cf-ray", "")
+    if cf_ray:
+        server_info["cf_ray"] = cf_ray
+        # Extract data center code from CF-Ray (format: request_id-datacenter_code)
+        cf_match = re.search(r'-([A-Z]{3})$', cf_ray)
+        if cf_match:
+            server_info["pop_code"] = cf_match.group(1)
+            server_info["pop_location"] = CLOUDFLARE_POP_LOCATIONS.get(
+                cf_match.group(1), f"Unknown location ({cf_match.group(1)})"
+            )
+            server_info["cdn_provider"] = "Cloudflare"
+
+    # Check for other CDN indicators
+    if not server_info["cdn_provider"]:
+        if "fastly" in headers.get("server", "").lower():
+            server_info["cdn_provider"] = "Fastly"
+        elif "cloudflare" in headers.get("server", "").lower():
+            server_info["cdn_provider"] = "Cloudflare"
+        elif "amazon" in headers.get("server", "").lower() or "aws" in headers.get("server", "").lower():
+            server_info["cdn_provider"] = "Amazon CloudFront"
+
+    return server_info
+
+
+async def select_best_upload_endpoint(test_data_size: int = 128 * 1024) -> dict:
+    """
+    Test multiple upload endpoints and select the best one based on latency and server location.
+    
+    Args:
+        test_data_size: Size of test data to upload (default: 128KB)
+        
+    Returns:
+        Dictionary with best endpoint info and performance data
+    """
+    test_results = []
+    test_data = b"x" * test_data_size
+
+    async with httpx.AsyncClient() as client:
+        for endpoint in DISTRIBUTED_UPLOAD_ENDPOINTS:
+            try:
+                # Measure upload time and server info
+                start_time = time.time()
+                response = await client.post(
+                    endpoint["url"],
+                    data=test_data,
+                    timeout=10.0
+                )
+                end_time = time.time()
+
+                upload_time = end_time - start_time
+                server_info = extract_server_info(dict(response.headers))
+
+                # Calculate speed in Mbps
+                speed_mbps = (test_data_size * 8) / (1024 * 1024) / upload_time
+
+                result = {
+                    "endpoint": endpoint,
+                    "upload_time": upload_time,
+                    "speed_mbps": round(speed_mbps, 2),
+                    "server_info": server_info,
+                    "status_code": response.status_code,
+                    "success": response.status_code == 200
+                }
+
+                test_results.append(result)
+
+            except Exception as e:
+                test_results.append({
+                    "endpoint": endpoint,
+                    "error": str(e),
+                    "success": False
+                })
+
+    # Sort by priority (lower is better) and then by speed (higher is better)
+    successful_results = [r for r in test_results if r.get("success", False)]
+
+    if not successful_results:
+        # If no successful results, return the first endpoint as fallback
+        return {
+            "selected_endpoint": DISTRIBUTED_UPLOAD_ENDPOINTS[0],
+            "reason": "fallback - no successful tests",
+            "all_results": test_results
+        }
+
+    # Sort by speed (descending) and priority (ascending)
+    best_endpoint = max(successful_results, key=lambda x: x["speed_mbps"])
+
+    return {
+        "selected_endpoint": best_endpoint["endpoint"],
+        "performance": {
+            "speed_mbps": best_endpoint["speed_mbps"],
+            "upload_time": best_endpoint["upload_time"],
+            "server_info": best_endpoint["server_info"]
+        },
+        "reason": "best_performance",
+        "all_results": test_results
+    }
+
 
 # Register tools
+@mcp.tool()
+async def measure_distributed_upload_speed(size_limit: str = "100MB") -> dict:
+    """
+    Measure upload speed using distributed endpoints with automatic best server selection.
+    Similar to how GitHub raw files use Fastly's global CDN network.
+    
+    Args:
+        size_limit: Maximum file size to test (default: 100MB)
+        
+    Returns:
+        Dictionary with upload speed results including server selection info
+    """
+    # First, select the best endpoint
+    print("🔍 Testing distributed upload endpoints...")
+    endpoint_selection = await select_best_upload_endpoint()
+
+    selected_endpoint = endpoint_selection["selected_endpoint"]
+    print(f"📍 Selected: {selected_endpoint['name']} ({selected_endpoint['provider']})")
+
+    # Now run the full upload test with the selected endpoint
+    upload_result = await measure_upload_speed(selected_endpoint["url"], size_limit)
+
+    # Add endpoint selection info to the result
+    upload_result["endpoint_selection"] = {
+        "selected_endpoint": selected_endpoint,
+        "selection_reason": endpoint_selection["reason"],
+        "performance_preview": endpoint_selection.get("performance", {}),
+        "tested_endpoints": len(endpoint_selection["all_results"]),
+        "successful_endpoints": len([r for r in endpoint_selection["all_results"] if r.get("success", False)])
+    }
+
+    return upload_result
+
+
 @mcp.tool()
 async def measure_download_speed(size_limit: str = "100MB") -> dict:
     """
@@ -132,45 +497,66 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
                 async with client.stream(
                     "GET", url,
                 ) as response:
+                    # Extract server information from headers
+                    server_info = extract_server_info(dict(response.headers))
+
                     async for chunk in response.aiter_bytes(chunk_size=1024):
                         if chunk:
                             chunk_size = len(chunk)
                             total_size += chunk_size
+
+                            # Check elapsed time during download
+                            current_time = time.time()
+                            elapsed_time = current_time - start
+
+                            # Update our final result continuously
+                            speed_mbps = (
+                                (total_size * 8) / (1024 * 1024)
+                            ) / elapsed_time
+                            final_result = {
+                                "download_speed": round(speed_mbps, 2),
+                                "elapsed_time": round(elapsed_time, 2),
+                                "data_size": total_size,
+                                "size": size_key,
+                                "url": url,
+                                "server_info": server_info,
+                            }
+
+                            # If test duration exceeded, stop the test
+                            if elapsed_time >= test_duration:
+                                break
+
             else:
                 # Skip sizes that don't have a corresponding URL
                 continue
 
-            end = time.time()
-            elapsed_time = end - start
+                # Store individual test result
+                results.append({
+                    "size": size_key,
+                    "download_speed": round(speed_mbps, 2),
+                    "elapsed_time": round(elapsed_time, 2),
+                    "data_size": total_size,
+                    "url": url,
+                    "server_info": server_info,
+                })
 
-            speed_mbps = (total_size * 8) / (
-                elapsed_time * 1_000_000
-            )  # bits to megabits
-            result = {
-                "size": size_key,
-                "download_speed": round(speed_mbps, 2),
-                "unit": "Mbps",
-                "elapsed_time": round(elapsed_time, 2),
-                "total_size": total_size,
-                "url": url,
-            }
-            results.append(result)
+                # If this test took longer than our threshold, we're done
+                if elapsed_time > test_duration:
+                    break
 
-            # Set the final result to the last result
-            final_result = result
-
-            # If this test took longer than our threshold, we're done
-            if elapsed_time > test_duration:
-                break
-
-    return {
-        "download_speed": final_result["download_speed"],
-        "unit": "Mbps",
-        "elapsed_time": final_result["elapsed_time"],
-        "total_size": final_result["total_size"],
-        "size_used": final_result["size"],
-        "all_tests": results,
-    }
+    # Return the final result or an error if all tests failed
+    if final_result:
+        return {
+            "download_speed": final_result["download_speed"],
+            "unit": "Mbps",
+            "elapsed_time": final_result["elapsed_time"],
+            "data_size": final_result["data_size"],
+            "size_used": final_result["size"],
+            "server_info": final_result["server_info"],
+            "all_tests": results,
+        }
+    else:
+        return {"error": True, "message": "All download tests failed", "details": results}
 
 
 @mcp.tool()
@@ -211,47 +597,33 @@ async def measure_upload_speed(
 
             try:
                 response = await client.post(
-                    url_upload,
-                    files={"file": ("test.dat", data)},
-                    timeout=60.0,  # Timeout for very large files
+                    url_upload, data=data, timeout=30.0
                 )
-
                 end = time.time()
                 elapsed_time = end - start
 
-                if response.status_code == 200:
-                    speed_mbps = (data_size * 8) / (
-                        elapsed_time * 1_000_000
-                    )  # bits to megabits
-                    result = {
-                        "size": size_key,
-                        "upload_speed": round(speed_mbps, 2),
-                        "unit": "Mbps",
-                        "elapsed_time": round(elapsed_time, 2),
-                        "data_size": data_size,
-                        "url": url_upload,
-                    }
+                # Extract server information from headers
+                server_info = extract_server_info(dict(response.headers))
 
-                    results.append(result)
+                # Calculate upload speed in Mbps
+                speed_mbps = (data_size * 8) / (1024 * 1024) / elapsed_time
+                result = {
+                    "size": size_key,
+                    "upload_speed": round(speed_mbps, 2),
+                    "elapsed_time": round(elapsed_time, 2),
+                    "data_size": data_size,
+                    "url": url_upload,
+                    "server_info": server_info,
+                }
 
-                    # Set the final result to the last result
-                    final_result = result
+                results.append(result)
 
-                    # If this test took longer than our threshold, we're done
-                    if elapsed_time > test_duration:
-                        break
-                else:
-                    results.append(
-                        {
-                            "size": size_key,
-                            "error": True,
-                            "message": f"HTTP Error: {response.status_code}",
-                            "url": url_upload,
-                        }
-                    )
-                    # If we encounter an error, use the last successful result or continue
-                    if final_result:
-                        break
+                # Set the final result to the last result
+                final_result = result
+
+                # If this test took longer than our threshold, we're done
+                if elapsed_time > test_duration:
+                    break
 
             except Exception as e:
                 results.append(
@@ -274,6 +646,7 @@ async def measure_upload_speed(
             "elapsed_time": final_result["elapsed_time"],
             "data_size": final_result["data_size"],
             "size_used": final_result["size"],
+            "server_info": final_result["server_info"],
             "all_tests": results,
         }
     else:
@@ -288,24 +661,64 @@ async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
         response = await client.get(url)
     end = time.time()
     elapsed_time = end - start
+
+    # Extract server information from headers
+    server_info = extract_server_info(dict(response.headers))
+
     return {
         "latency": round(elapsed_time * 1000, 2),  # Convert to milliseconds
         "unit": "ms",
         "url": url,
+        "server_info": server_info,
     }
+
+
+@mcp.tool()
+async def get_server_info(url: str) -> dict:
+    """
+    Get server information for any URL without performing speed tests.
+
+    Args:
+        url: URL to analyze
+
+    Returns:
+        Dictionary with server information including POP location, CDN info, etc.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.head(url, timeout=10.0)
+            server_info = extract_server_info(dict(response.headers))
+
+            return {
+                "url": url,
+                "status_code": response.status_code,
+                "server_info": server_info,
+                "headers": dict(response.headers)
+            }
+        except Exception as e:
+            return {
+                "error": True,
+                "message": f"Failed to get server info: {str(e)}",
+                "url": url
+            }
 
 
 @mcp.tool()
 async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
     """Jitter is the variation in latency, so we need multiple measurements."""
     latency_values = []
+    server_info = None
 
     async with httpx.AsyncClient() as client:
-        for _ in range(samples):
+        for i in range(samples):
             start = time.time()
             response = await client.get(url)
             end = time.time()
             latency_values.append((end - start) * 1000)  # Convert to milliseconds
+
+            # Extract server info from the first response
+            if i == 0:
+                server_info = extract_server_info(dict(response.headers))
 
     # Calculate average latency
     avg_latency = sum(latency_values) / len(latency_values)
@@ -321,6 +734,7 @@ async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> di
         "average_latency": round(avg_latency, 2),
         "samples": samples,
         "url": url,
+        "server_info": server_info,
     }
 
 
@@ -359,6 +773,48 @@ async def run_complete_test(
         "latency": latency_result,
         "jitter": jitter_result,
         "test_methodology": "Incremental file size approach with 8-second threshold",
+    }
+
+
+@mcp.tool()
+async def run_distributed_speed_test(
+    max_size: str = "100MB",
+    url_latency: str = DEFAULT_LATENCY_URL,
+) -> dict:
+    """
+    Run a complete speed test with distributed upload endpoints for improved accuracy.
+    
+    This test uses:
+    - Download: GitHub raw files via Fastly CDN (multiple POPs)
+    - Upload: Multiple distributed endpoints with automatic selection
+    - Latency & Jitter: Configurable endpoint
+    
+    Args:
+        max_size: Maximum file size to test (default: 100MB)
+        url_latency: URL for latency testing
+        
+    Returns:
+        Complete test results with distributed upload methodology
+    """
+    print("🚀 Starting distributed speed test...")
+
+    download_result = await measure_download_speed(max_size)
+    upload_result = await measure_distributed_upload_speed(max_size)
+    latency_result = await measure_latency(url_latency)
+    jitter_result = await measure_jitter(url_latency)
+
+    return {
+        "timestamp": time.time(),
+        "download": download_result,
+        "upload": upload_result,
+        "latency": latency_result,
+        "jitter": jitter_result,
+        "test_methodology": "Distributed endpoints with automatic server selection",
+        "methodology_details": {
+            "download_source": "GitHub raw files via Fastly CDN",
+            "upload_methodology": "Multiple distributed endpoints with best server selection",
+            "server_selection": "Automatic based on latency and performance"
+        }
     }
 
 

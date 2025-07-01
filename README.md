@@ -12,11 +12,17 @@ The Model Context Protocol (MCP) provides a standardized way for Large Language 
 
 ## Features
 
-- **Download Speed Testing**: Measure download bandwidth
-- **Upload Speed Testing**: Measure upload bandwidth with configurable file sizes
+- **Download Speed Testing**: Measure download bandwidth with incremental file sizes
+- **Upload Speed Testing**: Measure upload bandwidth with configurable file sizes  
+- **🆕 Distributed Upload Testing**: Multiple geographically distributed upload endpoints with automatic best server selection
 - **Latency Testing**: Measure network latency to various servers
 - **Jitter Analysis**: Calculate network jitter by analyzing latency variations
-- **Comprehensive Reporting**: Provide detailed JSON-formatted reports
+- **🆕 CDN Server Detection**: Identify which CDN server is serving your tests (Fastly, Cloudflare, AWS)
+- **🆕 Geographic Location**: Determine the physical location of CDN Points of Presence (POPs)
+- **🆕 Cache Analysis**: Detect if content is served from cache (HIT) or origin (MISS)
+- **🆕 Server Information**: Extract detailed server headers and CDN provider information
+- **🆕 Smart Server Selection**: Automatically select the best upload endpoint based on performance
+- **Comprehensive Reporting**: Provide detailed JSON-formatted reports with server metadata
 
 ## Installation
 
@@ -73,11 +79,63 @@ Edit your Claude Desktop MCP configuration file:
 
 The MCP Internet Speed Test provides the following tools:
 
-1. `measure_download_speed`: Measures download bandwidth (in Mbps)
-2. `measure_upload_speed`: Measures upload bandwidth (in Mbps)
-3. `measure_latency`: Measures network latency (in ms)
-4. `measure_jitter`: Measures network jitter by analyzing latency variations
-5. `run_complete_test`: Runs all tests and provides a comprehensive report
+### Core Testing Functions
+1. `measure_download_speed`: Measures download bandwidth (in Mbps) with server location info
+2. `measure_upload_speed`: Measures upload bandwidth (in Mbps) with server location info
+3. `measure_latency`: Measures network latency (in ms) with server location info
+4. `measure_jitter`: Measures network jitter by analyzing latency variations with server info
+5. `get_server_info`: Get detailed CDN server information for any URL without running speed tests
+
+### 🆕 Distributed Testing Functions
+6. `measure_distributed_upload_speed`: Advanced upload testing with automatic server selection
+7. `run_distributed_speed_test`: Complete test suite using distributed endpoints
+8. `run_complete_test`: Standard comprehensive test with server metadata
+
+### Distributed Upload Methodology
+
+The new distributed upload testing provides significant improvements over traditional single-endpoint testing:
+
+- **Multiple Endpoints**: Tests 7 different geographically distributed upload servers
+- **Automatic Selection**: Chooses the best-performing endpoint based on initial performance tests
+- **CDN Diversity**: Includes Cloudflare Workers, AWS, and independent endpoints
+- **Real-World Accuracy**: Mirrors how modern web applications use distributed infrastructure
+- **Fallback Support**: Gracefully handles endpoint failures with automatic fallback
+
+## 🚀 New: CDN Server Detection
+
+This speed test now provides detailed information about the CDN servers serving your tests:
+
+### What You Get
+- **CDN Provider**: Identifies if you're connecting to Fastly, Cloudflare, or Amazon CloudFront
+- **Geographic Location**: Shows the physical location of the server (e.g., "Mexico City, Mexico")
+- **POP Code**: Three-letter code identifying the Point of Presence (e.g., "MEX", "QRO", "DFW")
+- **Cache Status**: Whether content is served from cache (HIT) or fetched from origin (MISS)
+- **Server Headers**: Full HTTP headers including `x-served-by`, `via`, and `x-cache`
+
+### Why This Matters
+- **Network Diagnostics**: Understand which server is actually serving your tests
+- **Performance Analysis**: Correlate speed results with server proximity
+- **CDN Optimization**: Identify if your ISP's routing is optimal
+- **Geographic Awareness**: Know if tests are running from your expected region
+
+### Example Server Info Output
+```json
+{
+  "cdn_provider": "Fastly",
+  "pop_code": "MEX",
+  "pop_location": "Mexico City, Mexico",
+  "served_by": "cache-mex4329-MEX",
+  "cache_status": "HIT",
+  "x_cache": "HIT, HIT"
+}
+```
+
+### Supported Locations
+The system recognizes 50+ Fastly POP locations worldwide including:
+- **Americas**: Mexico City, Querétaro, Dallas, Los Angeles, New York, Miami, São Paulo, Santiago
+- **Europe**: London, Frankfurt, Amsterdam, Paris, Madrid, Milan, Stockholm
+- **Asia-Pacific**: Tokyo, Singapore, Sydney, Hong Kong, Seoul, Mumbai, Bangkok
+- **And many more...**
 
 ## Troubleshooting
 
