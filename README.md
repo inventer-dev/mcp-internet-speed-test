@@ -13,15 +13,13 @@ The Model Context Protocol (MCP) provides a standardized way for Large Language 
 ## Features
 
 - **Download Speed Testing**: Measure download bandwidth with incremental file sizes
-- **Upload Speed Testing**: Measure upload bandwidth with configurable file sizes  
-- **🆕 Distributed Upload Testing**: Multiple geographically distributed upload endpoints with automatic best server selection
+- **Upload Speed Testing**: Measure upload bandwidth with configurable file sizes
 - **Latency Testing**: Measure network latency to various servers
 - **Jitter Analysis**: Calculate network jitter by analyzing latency variations
-- **🆕 CDN Server Detection**: Identify which CDN server is serving your tests (Fastly, Cloudflare, AWS)
-- **🆕 Geographic Location**: Determine the physical location of CDN Points of Presence (POPs)
-- **🆕 Cache Analysis**: Detect if content is served from cache (HIT) or origin (MISS)
-- **🆕 Server Information**: Extract detailed server headers and CDN provider information
-- **🆕 Smart Server Selection**: Automatically select the best upload endpoint based on performance
+- **CDN Server Detection**: Identify which CDN server is serving your tests (Fastly, Cloudflare, AWS)
+- **Geographic Location**: Determine the physical location of CDN Points of Presence (POPs)
+- **Cache Analysis**: Detect if content is served from cache (HIT) or origin (MISS)
+- **Server Information**: Extract detailed server headers and CDN provider information
 - **Comprehensive Reporting**: Provide detailed JSON-formatted reports with server metadata
 
 ## Installation
@@ -79,29 +77,15 @@ Edit your Claude Desktop MCP configuration file:
 
 The MCP Internet Speed Test provides the following tools:
 
-### Core Testing Functions
+### Testing Functions
 1. `measure_download_speed`: Measures download bandwidth (in Mbps) with server location info
 2. `measure_upload_speed`: Measures upload bandwidth (in Mbps) with server location info
 3. `measure_latency`: Measures network latency (in ms) with server location info
 4. `measure_jitter`: Measures network jitter by analyzing latency variations with server info
 5. `get_server_info`: Get detailed CDN server information for any URL without running speed tests
+6. `run_complete_test`: Comprehensive test with all metrics and server metadata
 
-### 🆕 Distributed Testing Functions
-6. `measure_distributed_upload_speed`: Advanced upload testing with automatic server selection
-7. `run_distributed_speed_test`: Complete test suite using distributed endpoints
-8. `run_complete_test`: Standard comprehensive test with server metadata
-
-### Distributed Upload Methodology
-
-The new distributed upload testing provides significant improvements over traditional single-endpoint testing:
-
-- **Multiple Endpoints**: Tests 7 different geographically distributed upload servers
-- **Automatic Selection**: Chooses the best-performing endpoint based on initial performance tests
-- **CDN Diversity**: Includes Cloudflare Workers, AWS, and independent endpoints
-- **Real-World Accuracy**: Mirrors how modern web applications use distributed infrastructure
-- **Fallback Support**: Gracefully handles endpoint failures with automatic fallback
-
-## 🚀 New: CDN Server Detection
+## CDN Server Detection
 
 This speed test now provides detailed information about the CDN servers serving your tests:
 

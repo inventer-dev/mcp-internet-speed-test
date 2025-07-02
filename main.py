@@ -59,7 +59,7 @@ DEFAULT_DOWNLOAD_URLS = {
 }
 
 # Distributed upload endpoints for geographic diversity
-DISTRIBUTED_UPLOAD_ENDPOINTS = [
+UPLOAD_ENDPOINTS = [
     {
         "url": "https://httpi.dev/",
         "name": "Cloudflare Workers (Global)",
@@ -71,42 +71,12 @@ DISTRIBUTED_UPLOAD_ENDPOINTS = [
         "name": "HTTPBin (AWS)",
         "provider": "AWS",
         "priority": 2
-    },
-    {
-        "url": "https://httpbun.com/",
-        "name": "HTTPBun (Primary)", 
-        "provider": "Independent",
-        "priority": 3
-    },
-    {
-        "url": "https://ant.httpbun.com/",
-        "name": "HTTPBun Ant",
-        "provider": "Independent", 
-        "priority": 4
-    },
-    {
-        "url": "https://bat.httpbun.com/",
-        "name": "HTTPBun Bat",
-        "provider": "Independent",
-        "priority": 5
-    },
-    {
-        "url": "https://cat.httpbun.com/",
-        "name": "HTTPBun Cat",
-        "provider": "Independent",
-        "priority": 6
-    },
-    {
-        "url": "https://dog.httpbun.com/", 
-        "name": "HTTPBun Dog",
-        "provider": "Independent",
-        "priority": 7
     }
 ]
 
 # Primary endpoints for backward compatibility
-DEFAULT_UPLOAD_URL = DISTRIBUTED_UPLOAD_ENDPOINTS[0]["url"] + "post" # Use Cloudflare by default
-DEFAULT_LATENCY_URL = DISTRIBUTED_UPLOAD_ENDPOINTS[0]["url"] + "get" # Use Cloudflare by default
+DEFAULT_UPLOAD_URL = UPLOAD_ENDPOINTS[0]["url"] + "post" # Use Cloudflare by default
+DEFAULT_LATENCY_URL = UPLOAD_ENDPOINTS[0]["url"] + "get" # Use Cloudflare by default
 
 # File sizes in bytes for upload testing
 UPLOAD_SIZES = {
@@ -350,116 +320,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
     return server_info
 
 
-async def select_best_upload_endpoint(test_data_size: int = 128 * 1024) -> dict:
-    """
-    Test multiple upload endpoints and select the best one based on latency and server location.
-    
-    Args:
-        test_data_size: Size of test data to upload (default: 128KB)
-        
-    Returns:
-        Dictionary with best endpoint info and performance data
-    """
-    test_results = []
-    test_data = b"x" * test_data_size
-
-    async with httpx.AsyncClient() as client:
-        for endpoint in DISTRIBUTED_UPLOAD_ENDPOINTS:
-            try:
-                # Measure upload time and server info
-                start_time = time.time()
-                response = await client.post(
-                    endpoint["url"],
-                    data=test_data,
-                    timeout=10.0
-                )
-                end_time = time.time()
-
-                upload_time = end_time - start_time
-                server_info = extract_server_info(dict(response.headers))
-
-                # Calculate speed in Mbps
-                speed_mbps = (test_data_size * 8) / (1024 * 1024) / upload_time
-
-                result = {
-                    "endpoint": endpoint,
-                    "upload_time": upload_time,
-                    "speed_mbps": round(speed_mbps, 2),
-                    "server_info": server_info,
-                    "status_code": response.status_code,
-                    "success": response.status_code == 200
-                }
-
-                test_results.append(result)
-
-            except Exception as e:
-                test_results.append({
-                    "endpoint": endpoint,
-                    "error": str(e),
-                    "success": False
-                })
-
-    # Sort by priority (lower is better) and then by speed (higher is better)
-    successful_results = [r for r in test_results if r.get("success", False)]
-
-    if not successful_results:
-        # If no successful results, return the first endpoint as fallback
-        return {
-            "selected_endpoint": DISTRIBUTED_UPLOAD_ENDPOINTS[0],
-            "reason": "fallback - no successful tests",
-            "all_results": test_results
-        }
-
-    # Sort by speed (descending) and priority (ascending)
-    best_endpoint = max(successful_results, key=lambda x: x["speed_mbps"])
-
-    return {
-        "selected_endpoint": best_endpoint["endpoint"],
-        "performance": {
-            "speed_mbps": best_endpoint["speed_mbps"],
-            "upload_time": best_endpoint["upload_time"],
-            "server_info": best_endpoint["server_info"]
-        },
-        "reason": "best_performance",
-        "all_results": test_results
-    }
-
-
 # Register tools
-@mcp.tool()
-async def measure_distributed_upload_speed(size_limit: str = "100MB") -> dict:
-    """
-    Measure upload speed using distributed endpoints with automatic best server selection.
-    Similar to how GitHub raw files use Fastly's global CDN network.
-    
-    Args:
-        size_limit: Maximum file size to test (default: 100MB)
-        
-    Returns:
-        Dictionary with upload speed results including server selection info
-    """
-    # First, select the best endpoint
-    print("🔍 Testing distributed upload endpoints...")
-    endpoint_selection = await select_best_upload_endpoint()
-
-    selected_endpoint = endpoint_selection["selected_endpoint"]
-    print(f"📍 Selected: {selected_endpoint['name']} ({selected_endpoint['provider']})")
-
-    # Now run the full upload test with the selected endpoint
-    upload_result = await measure_upload_speed(selected_endpoint["url"], size_limit)
-
-    # Add endpoint selection info to the result
-    upload_result["endpoint_selection"] = {
-        "selected_endpoint": selected_endpoint,
-        "selection_reason": endpoint_selection["reason"],
-        "performance_preview": endpoint_selection.get("performance", {}),
-        "tested_endpoints": len(endpoint_selection["all_results"]),
-        "successful_endpoints": len([r for r in endpoint_selection["all_results"] if r.get("success", False)])
-    }
-
-    return upload_result
-
-
 @mcp.tool()
 async def measure_download_speed(size_limit: str = "100MB") -> dict:
     """
@@ -773,48 +634,6 @@ async def run_complete_test(
         "latency": latency_result,
         "jitter": jitter_result,
         "test_methodology": "Incremental file size approach with 8-second threshold",
-    }
-
-
-@mcp.tool()
-async def run_distributed_speed_test(
-    max_size: str = "100MB",
-    url_latency: str = DEFAULT_LATENCY_URL,
-) -> dict:
-    """
-    Run a complete speed test with distributed upload endpoints for improved accuracy.
-    
-    This test uses:
-    - Download: GitHub raw files via Fastly CDN (multiple POPs)
-    - Upload: Multiple distributed endpoints with automatic selection
-    - Latency & Jitter: Configurable endpoint
-    
-    Args:
-        max_size: Maximum file size to test (default: 100MB)
-        url_latency: URL for latency testing
-        
-    Returns:
-        Complete test results with distributed upload methodology
-    """
-    print("🚀 Starting distributed speed test...")
-
-    download_result = await measure_download_speed(max_size)
-    upload_result = await measure_distributed_upload_speed(max_size)
-    latency_result = await measure_latency(url_latency)
-    jitter_result = await measure_jitter(url_latency)
-
-    return {
-        "timestamp": time.time(),
-        "download": download_result,
-        "upload": upload_result,
-        "latency": latency_result,
-        "jitter": jitter_result,
-        "test_methodology": "Distributed endpoints with automatic server selection",
-        "methodology_details": {
-            "download_source": "GitHub raw files via Fastly CDN",
-            "upload_methodology": "Multiple distributed endpoints with best server selection",
-            "server_selection": "Automatic based on latency and performance"
-        }
     }
 
 
