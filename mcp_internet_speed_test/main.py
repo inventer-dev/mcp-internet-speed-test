@@ -1,11 +1,11 @@
 """
-Server for the internet speed test
+Model Context Protocol for the internet speed test
 
-This module implements an internet speed test service inspired by SpeedOf.Me methodology.
+This MCP implements an internet speed test service inspired by SpeedOf.Me methodology.
 
 ## How It Works
 
-This speed test uses an incremental testing approach:
+An internet speed test uses an incremental testing approach:
 
 ### Download Test
 - Begins with downloading the smallest sample size (128 KB)
@@ -64,19 +64,19 @@ UPLOAD_ENDPOINTS = [
         "url": "https://httpi.dev/",
         "name": "Cloudflare Workers (Global)",
         "provider": "Cloudflare",
-        "priority": 1  # Highest priority due to global distribution
+        "priority": 1,  # Highest priority due to global distribution
     },
     {
-        "url": "https://httpbin.org/", 
+        "url": "https://httpbin.org/",
         "name": "HTTPBin (AWS)",
         "provider": "AWS",
-        "priority": 2
-    }
+        "priority": 2,
+    },
 ]
 
 # Primary endpoints for backward compatibility
-DEFAULT_UPLOAD_URL = UPLOAD_ENDPOINTS[0]["url"] + "post" # Use Cloudflare by default
-DEFAULT_LATENCY_URL = UPLOAD_ENDPOINTS[0]["url"] + "get" # Use Cloudflare by default
+DEFAULT_UPLOAD_URL = UPLOAD_ENDPOINTS[0]["url"] + "post"  # Use Cloudflare by default
+DEFAULT_LATENCY_URL = UPLOAD_ENDPOINTS[0]["url"] + "get"  # Use Cloudflare by default
 
 # File sizes in bytes for upload testing
 UPLOAD_SIZES = {
@@ -168,13 +168,13 @@ FASTLY_POP_LOCATIONS = {
     "SJO": "San José, Costa Rica",
     "GUA": "Guatemala City, Guatemala",
     "SDQ": "Santo Domingo, Dominican Republic",
-    "SJU": "San Juan, Puerto Rico"
+    "SJU": "San Juan, Puerto Rico",
 }
 
 # Cloudflare data center locations mapping
 CLOUDFLARE_POP_LOCATIONS = {
     "DFW": "Dallas, Texas, USA",
-    "LAX": "Los Angeles, California, USA", 
+    "LAX": "Los Angeles, California, USA",
     "SJC": "San Jose, California, USA",
     "SEA": "Seattle, Washington, USA",
     "ORD": "Chicago, Illinois, USA",
@@ -197,7 +197,7 @@ CLOUDFLARE_POP_LOCATIONS = {
     "PRG": "Prague, Czech Republic",
     "VIE": "Vienna, Austria",
     "ZUR": "Zurich, Switzerland",
-    "MIL": "Milan, Italy", 
+    "MIL": "Milan, Italy",
     "FCO": "Rome, Italy",
     "MAD": "Madrid, Spain",
     "BCN": "Barcelona, Spain",
@@ -247,14 +247,131 @@ CLOUDFLARE_POP_LOCATIONS = {
     "QRO": "Querétaro, Mexico",
 }
 
+# AWS CloudFront edge location POP codes mapping
+AWS_POP_LOCATIONS = {
+    # North America
+    "ATL": "Atlanta, Georgia, USA",
+    "BOS": "Boston, Massachusetts, USA",
+    "ORD": "Chicago, Illinois, USA",
+    "CMH": "Columbus, Ohio, USA",
+    "DFW": "Dallas, Texas, USA",
+    "DEN": "Denver, Colorado, USA",
+    "DTW": "Detroit, Michigan, USA",
+    "IAH": "Houston, Texas, USA",
+    "MCI": "Kansas City, Missouri, USA",
+    "LAX": "Los Angeles, California, USA",
+    "MIA": "Miami, Florida, USA",
+    "MSP": "Minneapolis, Minnesota, USA",
+    "BNA": "Nashville, Tennessee, USA",
+    "JFK": "New York, New York, USA",
+    "EWR": "Newark, New Jersey, USA",
+    "PHL": "Philadelphia, Pennsylvania, USA",
+    "PHX": "Phoenix, Arizona, USA",
+    "PIT": "Pittsburgh, Pennsylvania, USA",
+    "HIO": "Portland, Oregon, USA",
+    "SLC": "Salt Lake City, Utah, USA",
+    "SFO": "San Francisco, California, USA",
+    "SEA": "Seattle, Washington, USA",
+    "TPA": "Tampa, Florida, USA",
+    "IAD": "Washington, DC, USA",
+    "YUL": "Montreal, Quebec, Canada",
+    "YTO": "Toronto, Ontario, Canada",
+    "YVR": "Vancouver, British Columbia, Canada",
+    "QRO": "Querétaro, Mexico",
+    # South America
+    "BOG": "Bogotá, Colombia",
+    "EZE": "Buenos Aires, Argentina",
+    "FOR": "Fortaleza, Brazil",
+    "LIM": "Lima, Peru",
+    "GIG": "Rio de Janeiro, Brazil",
+    "SCL": "Santiago, Chile",
+    "GRU": "São Paulo, Brazil",
+    # Europe
+    "AMS": "Amsterdam, Netherlands",
+    "ATH": "Athens, Greece",
+    "TXL": "Berlin, Germany",
+    "BRU": "Brussels, Belgium",
+    "OTP": "Bucharest, Romania",
+    "BUD": "Budapest, Hungary",
+    "CPH": "Copenhagen, Denmark",
+    "DUB": "Dublin, Ireland",
+    "DUS": "Düsseldorf, Germany",
+    "FRA": "Frankfurt am Main, Germany",
+    "HAM": "Hamburg, Germany",
+    "HEL": "Helsinki, Finland",
+    "LIS": "Lisbon, Portugal",
+    "LHR": "London, United Kingdom",
+    "MAD": "Madrid, Spain",
+    "MAN": "Manchester, United Kingdom",
+    "MRS": "Marseille, France",
+    "MXP": "Milan, Italy",
+    "MUC": "Munich, Germany",
+    "OSL": "Oslo, Norway",
+    "PMO": "Palermo, Italy",
+    "CDG": "Paris, France",
+    "PRG": "Prague, Czech Republic",
+    "FCO": "Rome, Italy",
+    "SOF": "Sofia, Bulgaria",
+    "ARN": "Stockholm, Sweden",
+    "VIE": "Vienna, Austria",
+    "WAW": "Warsaw, Poland",
+    "ZAG": "Zagreb, Croatia",
+    "ZRH": "Zurich, Switzerland",
+    "IST": "Istanbul, Turkey",
+    # Middle East
+    "DXB": "Dubai, UAE",
+    "FJR": "Fujairah, UAE",
+    "JED": "Jeddah, Saudi Arabia",
+    "BAH": "Manama, Bahrain",
+    "MCT": "Muscat, Oman",
+    "DOH": "Doha, Qatar",
+    "TLV": "Tel Aviv, Israel",
+    # Africa
+    "CAI": "Cairo, Egypt",
+    "CPT": "Cape Town, South Africa",
+    "JNB": "Johannesburg, South Africa",
+    "LOS": "Lagos, Nigeria",
+    "NBO": "Nairobi, Kenya",
+    # Asia Pacific
+    "BKK": "Bangkok, Thailand",
+    "PEK": "Beijing, China",
+    "BLR": "Bengaluru, India",
+    "MAA": "Chennai, India",
+    "DEL": "New Delhi, India",
+    "HAN": "Hanoi, Vietnam",
+    "SGN": "Ho Chi Minh City, Vietnam",
+    "HKG": "Hong Kong, China",
+    "HYD": "Hyderabad, India",
+    "CGK": "Jakarta, Indonesia",
+    "CCU": "Kolkata, India",
+    "KUL": "Kuala Lumpur, Malaysia",
+    "MNL": "Manila, Philippines",
+    "BOM": "Mumbai, India",
+    "KIX": "Osaka, Japan",
+    "PNQ": "Pune, India",
+    "ICN": "Seoul, South Korea",
+    "PVG": "Shanghai, China",
+    "SZX": "Shenzhen, China",
+    "SIN": "Singapore",
+    "TPE": "Taoyuan, Taiwan",
+    "NRT": "Tokyo, Japan",
+    "ZHY": "Zhongwei, China",
+    # Australia & Oceania
+    "AKL": "Auckland, New Zealand",
+    "BNE": "Brisbane, Australia",
+    "MEL": "Melbourne, Australia",
+    "PER": "Perth, Australia",
+    "SYD": "Sydney, Australia",
+}
+
 
 def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
     """
     Extract server information from HTTP headers.
-    
+
     Args:
         headers: HTTP response headers
-        
+
     Returns:
         Dictionary with server information including POP location, CDN info, etc.
     """
@@ -266,7 +383,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
         "via_header": None,
         "cache_status": None,
         "server_ip_info": None,
-        "x_cache": None
+        "x_cache": None,
     }
 
     # Extract x-served-by header (Fastly specific)
@@ -276,7 +393,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
 
         # Extract POP code from served-by header
         # Format examples: cache-mex4329-MEX, cache-qro4141-QRO, cache-dfw-kdfw8210052-DFW
-        pop_match = re.search(r'-([A-Z]{3})$', served_by)
+        pop_match = re.search(r"-([A-Z]{3})$", served_by)
         if pop_match:
             server_info["pop_code"] = pop_match.group(1)
             server_info["pop_location"] = FASTLY_POP_LOCATIONS.get(
@@ -300,7 +417,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
     if cf_ray:
         server_info["cf_ray"] = cf_ray
         # Extract data center code from CF-Ray (format: request_id-datacenter_code)
-        cf_match = re.search(r'-([A-Z]{3})$', cf_ray)
+        cf_match = re.search(r"-([A-Z]{3})$", cf_ray)
         if cf_match:
             server_info["pop_code"] = cf_match.group(1)
             server_info["pop_location"] = CLOUDFLARE_POP_LOCATIONS.get(
@@ -308,13 +425,36 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
             )
             server_info["cdn_provider"] = "Cloudflare"
 
+    # Extract AWS CloudFront headers
+    cf_pop = headers.get("x-amz-cf-pop", "")
+    cf_id = headers.get("x-amz-cf-id", "")
+    if cf_pop:
+        server_info["cf_pop"] = cf_pop
+        server_info["cdn_provider"] = "Amazon CloudFront"
+
+        # Extract POP code from x-amz-cf-pop header (format: DFW56-P1, SIN5-C1)
+        cf_pop_match = re.search(r"^([A-Z]{3})", cf_pop)
+        if cf_pop_match:
+            server_info["pop_code"] = cf_pop_match.group(1)
+            server_info["pop_location"] = AWS_POP_LOCATIONS.get(
+                cf_pop_match.group(1), f"Unknown location ({cf_pop_match.group(1)})"
+            )
+
+    if cf_id:
+        server_info["cf_id"] = cf_id
+        if not server_info["cdn_provider"]:
+            server_info["cdn_provider"] = "Amazon CloudFront"
+
     # Check for other CDN indicators
     if not server_info["cdn_provider"]:
         if "fastly" in headers.get("server", "").lower():
             server_info["cdn_provider"] = "Fastly"
         elif "cloudflare" in headers.get("server", "").lower():
             server_info["cdn_provider"] = "Cloudflare"
-        elif "amazon" in headers.get("server", "").lower() or "aws" in headers.get("server", "").lower():
+        elif (
+            "amazon" in headers.get("server", "").lower()
+            or "aws" in headers.get("server", "").lower()
+        ):
             server_info["cdn_provider"] = "Amazon CloudFront"
 
     return server_info
@@ -345,65 +485,47 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
     # Test each file size in order, up to the specified limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
-            if size_key in DEFAULT_DOWNLOAD_URLS:
-                if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                    test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
-                else:
-                    test_duration = BASE_TEST_DURATION
-
-                url = DEFAULT_DOWNLOAD_URLS[size_key]
-                start = time.time()
-                total_size = 0
-
-                async with client.stream(
-                    "GET", url,
-                ) as response:
-                    # Extract server information from headers
-                    server_info = extract_server_info(dict(response.headers))
-
-                    async for chunk in response.aiter_bytes(chunk_size=1024):
-                        if chunk:
-                            chunk_size = len(chunk)
-                            total_size += chunk_size
-
-                            # Check elapsed time during download
-                            current_time = time.time()
-                            elapsed_time = current_time - start
-
-                            # Update our final result continuously
-                            speed_mbps = (
-                                (total_size * 8) / (1024 * 1024)
-                            ) / elapsed_time
-                            final_result = {
-                                "download_speed": round(speed_mbps, 2),
-                                "elapsed_time": round(elapsed_time, 2),
-                                "data_size": total_size,
-                                "size": size_key,
-                                "url": url,
-                                "server_info": server_info,
-                            }
-
-                            # If test duration exceeded, stop the test
-                            if elapsed_time >= test_duration:
-                                break
-
+            if size_key in ["100MB", "200MB", "500MB", "1GB"]:
+                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
             else:
-                # Skip sizes that don't have a corresponding URL
-                continue
+                test_duration = BASE_TEST_DURATION
 
-                # Store individual test result
-                results.append({
-                    "size": size_key,
-                    "download_speed": round(speed_mbps, 2),
-                    "elapsed_time": round(elapsed_time, 2),
-                    "data_size": total_size,
-                    "url": url,
-                    "server_info": server_info,
-                })
+            url = DEFAULT_DOWNLOAD_URLS[size_key]
+            start = time.time()
+            total_size = 0
 
-                # If this test took longer than our threshold, we're done
-                if elapsed_time > test_duration:
-                    break
+            async with client.stream(
+                "GET",
+                url,
+            ) as response:
+                # Extract server information from headers
+                server_info = extract_server_info(dict(response.headers))
+
+                async for chunk in response.aiter_bytes(chunk_size=1024):
+                    if chunk:
+                        chunk_size = len(chunk)
+                        total_size += chunk_size
+
+                        # Check elapsed time during download
+                        current_time = time.time()
+                        elapsed_time = current_time - start
+
+                        # Update our final result continuously
+                        speed_mbps = (
+                            (total_size * 8) / (1024 * 1024)
+                        ) / elapsed_time
+                        final_result = {
+                            "download_speed": round(speed_mbps, 2),
+                            "elapsed_time": round(elapsed_time, 2),
+                            "data_size": total_size,
+                            "size": size_key,
+                            "url": url,
+                            "server_info": server_info,
+                        }
+
+                        # If test duration exceeded, stop the test
+                        if elapsed_time >= test_duration:
+                            break
 
     # Return the final result or an error if all tests failed
     if final_result:
@@ -416,8 +538,11 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
             "server_info": final_result["server_info"],
             "all_tests": results,
         }
-    else:
-        return {"error": True, "message": "All download tests failed", "details": results}
+    return {
+        "error": True,
+        "message": "All download tests failed",
+        "details": results,
+    }
 
 
 @mcp.tool()
@@ -457,9 +582,7 @@ async def measure_upload_speed(
             start = time.time()
 
             try:
-                response = await client.post(
-                    url_upload, data=data, timeout=30.0
-                )
+                response = await client.post(url_upload, data=data, timeout=30.0)
                 end = time.time()
                 elapsed_time = end - start
 
@@ -510,8 +633,11 @@ async def measure_upload_speed(
             "server_info": final_result["server_info"],
             "all_tests": results,
         }
-    else:
-        return {"error": True, "message": "All upload tests failed", "details": results}
+    return {
+        "error": True,
+        "message": "All upload tests failed",
+        "details": results,
+    }
 
 
 @mcp.tool()
@@ -554,13 +680,13 @@ async def get_server_info(url: str) -> dict:
                 "url": url,
                 "status_code": response.status_code,
                 "server_info": server_info,
-                "headers": dict(response.headers)
+                "headers": dict(response.headers),
             }
         except Exception as e:
             return {
                 "error": True,
                 "message": f"Failed to get server info: {str(e)}",
-                "url": url
+                "url": url,
             }
 
 
