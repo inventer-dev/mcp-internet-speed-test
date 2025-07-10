@@ -511,9 +511,7 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
                         elapsed_time = current_time - start
 
                         # Update our final result continuously
-                        speed_mbps = (
-                            (total_size * 8) / (1024 * 1024)
-                        ) / elapsed_time
+                        speed_mbps = ((total_size * 8) / (1024 * 1024)) / elapsed_time
                         final_result = {
                             "download_speed": round(speed_mbps, 2),
                             "elapsed_time": round(elapsed_time, 2),
@@ -609,12 +607,12 @@ async def measure_upload_speed(
                 if elapsed_time > test_duration:
                     break
 
-            except Exception as e:
+            except (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException) as e:
                 results.append(
                     {
                         "size": size_key,
                         "error": True,
-                        "message": f"Exception: {str(e)}",
+                        "message": f"HTTP Error: {str(e)}",
                         "url": url_upload,
                     }
                 )
@@ -642,7 +640,14 @@ async def measure_upload_speed(
 
 @mcp.tool()
 async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
-    """Measure the latency"""
+    """Measure the latency
+
+    Args:
+        url (str): The URL to measure latency to
+
+    Returns:
+        Dictionary with latency result
+    """
     start = time.time()
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
@@ -658,36 +663,6 @@ async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
         "url": url,
         "server_info": server_info,
     }
-
-
-@mcp.tool()
-async def get_server_info(url: str) -> dict:
-    """
-    Get server information for any URL without performing speed tests.
-
-    Args:
-        url: URL to analyze
-
-    Returns:
-        Dictionary with server information including POP location, CDN info, etc.
-    """
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.head(url, timeout=10.0)
-            server_info = extract_server_info(dict(response.headers))
-
-            return {
-                "url": url,
-                "status_code": response.status_code,
-                "server_info": server_info,
-                "headers": dict(response.headers),
-            }
-        except Exception as e:
-            return {
-                "error": True,
-                "message": f"Failed to get server info: {str(e)}",
-                "url": url,
-            }
 
 
 @mcp.tool()
@@ -723,6 +698,64 @@ async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> di
         "url": url,
         "server_info": server_info,
     }
+
+
+@mcp.tool()
+async def get_server_info(
+    url_download: str = DEFAULT_DOWNLOAD_URLS["128KB"],
+    url_upload: str = DEFAULT_UPLOAD_URL,
+    url_latency: str = DEFAULT_LATENCY_URL,
+) -> dict:
+    """
+    Get server information for any URL without performing speed tests.
+
+    Args:
+        url_download: URL to download data from
+        url_upload: URL to upload data to
+        url_latency: URL to measure latency to
+
+    Returns:
+        Dictionary with servers information including POP location, CDN info, etc.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            response_url_download = await client.head(url_download, timeout=12.0)
+            server_info_url_download = extract_server_info(
+                dict(response_url_download.headers)
+            )
+
+            response_url_upload = await client.head(url_upload, timeout=12.0)
+            server_info_url_upload = extract_server_info(
+                dict(response_url_upload.headers)
+            )
+
+            response_url_latency = await client.head(url_latency, timeout=12.0)
+            server_info_url_latency = extract_server_info(
+                dict(response_url_latency.headers)
+            )
+
+            return {
+                "url_download": url_download,
+                "status_code_url_download": response_url_download.status_code,
+                "server_info_url_download": server_info_url_download,
+                "headers_url_download": dict(response_url_download.headers),
+                "url_upload": url_upload,
+                "status_code_url_upload": response_url_upload.status_code,
+                "server_info_url_upload": server_info_url_upload,
+                "headers_url_upload": dict(response_url_upload.headers),
+                "url_latency": url_latency,
+                "status_code_url_latency": response_url_latency.status_code,
+                "server_info_url_latency": server_info_url_latency,
+                "headers_url_latency": dict(response_url_latency.headers),
+            }
+        except (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException) as e:
+            return {
+                "error": True,
+                "message": f"Failed to get servers info: {str(e)}",
+                "url_download": url_download,
+                "url_upload": url_upload,
+                "url_latency": url_latency,
+            }
 
 
 @mcp.tool()
