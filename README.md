@@ -2,6 +2,10 @@
 
 [![smithery badge](https://smithery.ai/badge/@inventer-dev/mcp-internet-speed-test)](https://smithery.ai/server/@inventer-dev/mcp-internet-speed-test)
 
+<a href="https://glama.ai/mcp/servers/@inventer-dev/mcp-internet-speed-test">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@inventer-dev/mcp-internet-speed-test/badge" alt="mcp-internet-speed-test MCP server" />
+</a>
+
 # MCP Internet Speed Test
 
 An implementation of a Model Context Protocol (MCP) for internet speed testing. It allows AI models and agents to measure, analyze, and report network performance metrics through a standardized interface.
