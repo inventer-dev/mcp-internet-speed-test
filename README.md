@@ -1,6 +1,6 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/inventer-dev-mcp-internet-speed-test-badge.png)](https://mseep.ai/app/inventer-dev-mcp-internet-speed-test)
-
 [![smithery badge](https://smithery.ai/badge/@inventer-dev/mcp-internet-speed-test)](https://smithery.ai/server/@inventer-dev/mcp-internet-speed-test)
+
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/inventer-dev-mcp-internet-speed-test-badge.png)](https://mseep.ai/app/inventer-dev-mcp-internet-speed-test)
 
 <a href="https://glama.ai/mcp/servers/@inventer-dev/mcp-internet-speed-test">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@inventer-dev/mcp-internet-speed-test/badge" alt="mcp-internet-speed-test MCP server" />
