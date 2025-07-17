@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include *.toml
+include *.yaml
+include *.yml
+recursive-include mcp_internet_speed_test *.py

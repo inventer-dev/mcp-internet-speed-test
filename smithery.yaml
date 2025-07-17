@@ -1,28 +1,7 @@
 # Smithery.ai configuration
 startCommand:
   type: stdio
-  configSchema:
-    # JSON Schema defining the configuration options for the MCP
-    type: object
-    properties:
-      upload_url:
-        type: string
-        description: "URL for upload speed testing"
-        default: "https://httpbin.org/post"
-      latency_url:
-        type: string
-        description: "URL for latency testing"
-        default: "https://httpbin.org/get"
-    additionalProperties: false
   commandFunction: |-
     (config) => ({
-      "command": "python",
-      "args": [
-        "-m",
-        "main"
-      ],
-      "env": {
-        "DEFAULT_UPLOAD_URL": config.upload_url || "https://httpbin.org/post",
-        "DEFAULT_LATENCY_URL": config.latency_url || "https://httpbin.org/get"
-      }
+      "command": "mcp-internet-speed-test"
     })

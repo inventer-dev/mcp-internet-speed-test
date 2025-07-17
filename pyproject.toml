@@ -1,18 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mcp-internet-speed-test"
-version = "0.1.0"
+version = "0.1.1"
 description = "Enables AI models and agents to perform internet speed measurements."
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [
+    {name = "Pedro Cruz", email = "hola@inventer.dev"},
+]
+maintainers = [
+    {name = "Pedro Cruz", email = "hola@inventer.dev"},
+]
+keywords = ["mcp", "speed-test", "internet", "network", "ai", "model-context-protocol"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: System :: Networking :: Monitoring",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "mcp[cli]>=1.6.0",
     "httpx>=0.27.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/inventer-dev/mcp-internet-speed-test"
+"Bug Reports" = "https://github.com/inventer-dev/mcp-internet-speed-test/issues"
+"Source" = "https://github.com/inventer-dev/mcp-internet-speed-test"
+"Documentation" = "https://github.com/inventer-dev/mcp-internet-speed-test#readme"
+
 [project.scripts]
-mcp-internet-speed-test = "main:mcp.run"
+mcp-internet-speed-test = "mcp_internet_speed_test.main:mcp.run"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mcp_internet_speed_test*"]
