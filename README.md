@@ -1,3 +1,4 @@
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/inventer-dev/mcp-internet-speed-test)](https://archestra.ai/mcp-catalog/inventer-dev__mcp-internet-speed-test)
 [![smithery badge](https://smithery.ai/badge/@inventer-dev/mcp-internet-speed-test)](https://smithery.ai/server/@inventer-dev/mcp-internet-speed-test)
 
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/inventer-dev-mcp-internet-speed-test-badge.png)](https://mseep.ai/app/inventer-dev-mcp-internet-speed-test)
