@@ -24,15 +24,44 @@ An internet speed test uses an incremental testing approach:
 
 """
 
-import time
+import contextlib
 import re
-from typing import Dict, Optional
+import time
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP, Icon
+from mcp.server.session import ServerSession
+
+
+async def safe_report_progress(ctx, progress: int, total: int, message: str) -> None:
+    """Safely report progress, handling cases where context is unavailable."""
+    if ctx is None:
+        return
+    with contextlib.suppress(ValueError, AttributeError):
+        await ctx.report_progress(progress=progress, total=total, message=message)
+
+
+async def safe_log_info(ctx, message: str) -> None:
+    """Safely log info message, handling cases where context is unavailable."""
+    if ctx is None:
+        return
+    with contextlib.suppress(ValueError, AttributeError):
+        await ctx.info(message)
 
 # Create a singleton instance of FastMCP
 mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
+
+# Icons for tools (using data URIs for emoji-based icons)
+_SVG_TPL = (
+    "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' "
+    "viewBox='0 0 100 100'><text y='80' font-size='80'>{}</text></svg>"
+)
+ICON_DOWNLOAD = Icon(src=_SVG_TPL.format("⬇️"), mimeType="image/svg+xml")
+ICON_UPLOAD = Icon(src=_SVG_TPL.format("⬆️"), mimeType="image/svg+xml")
+ICON_LATENCY = Icon(src=_SVG_TPL.format("⏱️"), mimeType="image/svg+xml")
+ICON_JITTER = Icon(src=_SVG_TPL.format("📊"), mimeType="image/svg+xml")
+ICON_SERVER = Icon(src=_SVG_TPL.format("🖥️"), mimeType="image/svg+xml")
+ICON_COMPLETE = Icon(src=_SVG_TPL.format("🚀"), mimeType="image/svg+xml")
 
 # Default URLs for testing
 GITHUB_USERNAME = "inventer-dev"  # Replace with your GitHub username
@@ -365,7 +394,7 @@ AWS_POP_LOCATIONS = {
 }
 
 
-def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
+def extract_server_info(headers: dict[str, str]) -> dict[str, str | None]:
     """
     Extract server information from HTTP headers.
 
@@ -392,12 +421,12 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
         server_info["served_by"] = served_by
 
         # Extract POP code from served-by header
-        # Format examples: cache-mex4329-MEX, cache-qro4141-QRO, cache-dfw-kdfw8210052-DFW
+        # Format: cache-mex4329-MEX, cache-qro4141-QRO
         pop_match = re.search(r"-([A-Z]{3})$", served_by)
         if pop_match:
             server_info["pop_code"] = pop_match.group(1)
             server_info["pop_location"] = FASTLY_POP_LOCATIONS.get(
-                pop_match.group(1), f"Unknown location ({pop_match.group(1)})"
+                pop_match.group(1), f"Unknown location ({pop_match.group(1)})",
             )
             server_info["cdn_provider"] = "Fastly"
 
@@ -421,7 +450,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
         if cf_match:
             server_info["pop_code"] = cf_match.group(1)
             server_info["pop_location"] = CLOUDFLARE_POP_LOCATIONS.get(
-                cf_match.group(1), f"Unknown location ({cf_match.group(1)})"
+                cf_match.group(1), f"Unknown location ({cf_match.group(1)})",
             )
             server_info["cdn_provider"] = "Cloudflare"
 
@@ -437,7 +466,7 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
         if cf_pop_match:
             server_info["pop_code"] = cf_pop_match.group(1)
             server_info["pop_location"] = AWS_POP_LOCATIONS.get(
-                cf_pop_match.group(1), f"Unknown location ({cf_pop_match.group(1)})"
+                cf_pop_match.group(1), f"Unknown location ({cf_pop_match.group(1)})",
             )
 
     if cf_id:
@@ -461,8 +490,11 @@ def extract_server_info(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
 
 
 # Register tools
-@mcp.tool()
-async def measure_download_speed(size_limit: str = "100MB") -> dict:
+@mcp.tool(icons=[ICON_DOWNLOAD])
+async def measure_download_speed(
+    size_limit: str = "100MB",
+    ctx: Context[ServerSession, None] = None,
+) -> dict:
     """
     Measure download speed using incremental file sizes.
 
@@ -482,9 +514,17 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
         else len(SIZE_PROGRESSION) - 1
     )
 
+    total_steps = max_index + 1
+    current_step = 0
+
+    await safe_log_info(ctx, "Starting download speed test...")
+
     # Test each file size in order, up to the specified limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
+            current_step += 1
+            msg = f"Testing {size_key} file..."
+            await safe_report_progress(ctx, current_step, total_steps, msg)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
                 test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
             else:
@@ -543,9 +583,11 @@ async def measure_download_speed(size_limit: str = "100MB") -> dict:
     }
 
 
-@mcp.tool()
+@mcp.tool(icons=[ICON_UPLOAD])
 async def measure_upload_speed(
-    url_upload: str = DEFAULT_UPLOAD_URL, size_limit: str = "100MB"
+    url_upload: str = DEFAULT_UPLOAD_URL,
+    size_limit: str = "100MB",
+    ctx: Context[ServerSession, None] = None,
 ) -> dict:
     """
     Measure upload speed using incremental file sizes.
@@ -567,9 +609,17 @@ async def measure_upload_speed(
         else len(SIZE_PROGRESSION) - 1
     )
 
+    total_steps = max_index + 1
+    current_step = 0
+
+    await safe_log_info(ctx, "Starting upload speed test...")
+
     # Only test up to the specified size limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
+            current_step += 1
+            msg = f"Uploading {size_key} data..."
+            await safe_report_progress(ctx, current_step, total_steps, msg)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
                 test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
             else:
@@ -607,14 +657,18 @@ async def measure_upload_speed(
                 if elapsed_time > test_duration:
                     break
 
-            except (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException) as e:
+            except (
+                httpx.RequestError,
+                httpx.HTTPStatusError,
+                httpx.TimeoutException,
+            ) as e:
                 results.append(
                     {
                         "size": size_key,
                         "error": True,
-                        "message": f"HTTP Error: {str(e)}",
+                        "message": f"HTTP Error: {e!s}",
                         "url": url_upload,
-                    }
+                    },
                 )
                 # If we encounter an error, use the last successful result or continue
                 if final_result:
@@ -638,7 +692,7 @@ async def measure_upload_speed(
     }
 
 
-@mcp.tool()
+@mcp.tool(icons=[ICON_LATENCY])
 async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
     """Measure the latency
 
@@ -665,14 +719,21 @@ async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
     }
 
 
-@mcp.tool()
-async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> dict:
+@mcp.tool(icons=[ICON_JITTER])
+async def measure_jitter(
+    url: str = DEFAULT_LATENCY_URL,
+    samples: int = 5,
+    ctx: Context[ServerSession, None] = None,
+) -> dict:
     """Jitter is the variation in latency, so we need multiple measurements."""
     latency_values = []
     server_info = None
 
+    await safe_log_info(ctx, f"Starting jitter measurement with {samples} samples...")
+
     async with httpx.AsyncClient() as client:
         for i in range(samples):
+            await safe_report_progress(ctx, i + 1, samples, f"Sample {i + 1}/{samples}")
             start = time.time()
             response = await client.get(url)
             end = time.time()
@@ -687,7 +748,7 @@ async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> di
 
     # Calculate jitter (average deviation from the mean)
     jitter = sum(abs(latency - avg_latency) for latency in latency_values) / len(
-        latency_values
+        latency_values,
     )
 
     return {
@@ -700,7 +761,7 @@ async def measure_jitter(url: str = DEFAULT_LATENCY_URL, samples: int = 5) -> di
     }
 
 
-@mcp.tool()
+@mcp.tool(icons=[ICON_SERVER])
 async def get_server_info(
     url_download: str = DEFAULT_DOWNLOAD_URLS["128KB"],
     url_upload: str = DEFAULT_UPLOAD_URL,
@@ -721,17 +782,17 @@ async def get_server_info(
         try:
             response_url_download = await client.head(url_download, timeout=12.0)
             server_info_url_download = extract_server_info(
-                dict(response_url_download.headers)
+                dict(response_url_download.headers),
             )
 
             response_url_upload = await client.head(url_upload, timeout=12.0)
             server_info_url_upload = extract_server_info(
-                dict(response_url_upload.headers)
+                dict(response_url_upload.headers),
             )
 
             response_url_latency = await client.head(url_latency, timeout=12.0)
             server_info_url_latency = extract_server_info(
-                dict(response_url_latency.headers)
+                dict(response_url_latency.headers),
             )
 
             return {
@@ -751,18 +812,19 @@ async def get_server_info(
         except (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException) as e:
             return {
                 "error": True,
-                "message": f"Failed to get servers info: {str(e)}",
+                "message": f"Failed to get servers info: {e!s}",
                 "url_download": url_download,
                 "url_upload": url_upload,
                 "url_latency": url_latency,
             }
 
 
-@mcp.tool()
+@mcp.tool(icons=[ICON_COMPLETE])
 async def run_complete_test(
     max_size: str = "100MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
+    ctx: Context[ServerSession, None] = None,
 ) -> dict:
     """
     Run a complete speed test returning all metrics in a single call.
@@ -781,10 +843,24 @@ async def run_complete_test(
     Returns:
         Complete test results including download, upload, latency and jitter metrics
     """
-    download_result = await measure_download_speed(max_size)
-    upload_result = await measure_upload_speed(url_upload, max_size)
+    await safe_log_info(ctx, "Starting complete speed test...")
+    await safe_report_progress(ctx, 1, 4, "Testing download speed...")
+
+    download_result = await measure_download_speed(max_size, ctx)
+
+    await safe_report_progress(ctx, 2, 4, "Testing upload speed...")
+
+    upload_result = await measure_upload_speed(url_upload, max_size, ctx)
+
+    await safe_report_progress(ctx, 3, 4, "Measuring latency...")
+
     latency_result = await measure_latency(url_latency)
-    jitter_result = await measure_jitter(url_latency)
+
+    await safe_report_progress(ctx, 4, 4, "Measuring jitter...")
+
+    jitter_result = await measure_jitter(url_latency, 5, ctx)
+
+    await safe_log_info(ctx, "Complete speed test finished!")
 
     return {
         "timestamp": time.time(),
