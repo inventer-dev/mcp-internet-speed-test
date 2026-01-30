@@ -703,28 +703,43 @@ async def measure_upload_speed(
 
 
 @mcp.tool(icons=[ICON_LATENCY])
-async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
-    """Measure the latency
+async def measure_latency(
+    url: str = DEFAULT_LATENCY_URL,
+    samples: int = 10,
+) -> dict:
+    """Measure the latency using multiple samples and report the minimum.
+
+    Takes a number of samples and reports the lowest
+    value for the most accurate representation of network latency.
 
     Args:
         url (str): The URL to measure latency to
+        samples (int): Number of samples to take (default: 10)
 
     Returns:
-        Dictionary with latency result
+        Dictionary with latency result (minimum of all samples)
     """
-    start = time.time()
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-    end = time.time()
-    elapsed_time = end - start
+    latency_values = []
+    server_info = None
 
-    # Extract server information from headers
-    server_info = extract_server_info(dict(response.headers))
+    async with httpx.AsyncClient() as client:
+        for sample_index in range(samples):
+            start = time.time()
+            response = await client.get(url)
+            end = time.time()
+            latency_values.append((end - start) * 1000)
+
+            if sample_index == 0:
+                server_info = extract_server_info(dict(response.headers))
 
     return {
-        "latency": round(elapsed_time * 1000, 2),  # Convert to milliseconds
+        "latency": round(min(latency_values), 2),
         "unit": "ms",
         "url": url,
+        "samples": samples,
+        "min_latency": round(min(latency_values), 2),
+        "max_latency": round(max(latency_values), 2),
+        "avg_latency": round(sum(latency_values) / len(latency_values), 2),
         "server_info": server_info,
     }
 
@@ -743,7 +758,8 @@ async def measure_jitter(
 
     async with httpx.AsyncClient() as client:
         for sample_index in range(samples):
-            await safe_report_progress(context, sample_index + 1, samples, f"Sample {sample_index + 1}/{samples}")
+            msg = f"Sample {sample_index + 1}/{samples}"
+            await safe_report_progress(context, sample_index + 1, samples, msg)
             start = time.time()
             response = await client.get(url)
             end = time.time()
