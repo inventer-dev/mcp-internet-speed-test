@@ -27,7 +27,7 @@ The Model Context Protocol (MCP) provides a standardized way for Large Language 
 - **Smart Incremental Testing**: Uses SpeedOf.Me methodology with 8-second threshold for optimal accuracy
 - **Download Speed Testing**: Measures bandwidth using files from 128KB to 100MB from GitHub repository
 - **Upload Speed Testing**: Tests upload bandwidth using generated data from 128KB to 100MB
-- **Latency Testing**: Measures network latency with detailed server location information
+- **Latency Testing**: Measures network latency using 10 samples, reports minimum value (SpeedOf.Me methodology)
 - **Jitter Analysis**: Calculates network stability using multiple latency samples (default: 5)
 - **Multi-CDN Support**: Detects and provides info for Fastly, Cloudflare, and AWS CloudFront
 - **Geographic Location**: Maps POP codes to physical locations (50+ locations worldwide)
@@ -136,7 +136,7 @@ The MCP Internet Speed Test provides the following tools:
 ### Testing Functions
 1. `measure_download_speed`: Measures download bandwidth (in Mbps) with server location info
 2. `measure_upload_speed`: Measures upload bandwidth (in Mbps) with server location info
-3. `measure_latency`: Measures network latency (in ms) with server location info
+3. `measure_latency`: Measures network latency (in ms) using 10 samples, reports minimum value
 4. `measure_jitter`: Measures network jitter by analyzing latency variations with server info
 5. `get_server_info`: Get detailed CDN server information for any URL without running speed tests
 6. `run_complete_test`: Comprehensive test with all metrics and server metadata
@@ -156,7 +156,7 @@ This speed test now provides detailed information about the CDN servers serving 
 
 #### Smart Testing Methodology
 - **Incremental Approach**: Starts with small files (128KB) and progressively increases
-- **Time-Based Optimization**: Uses 8-second base threshold + 4-second additional buffer
+- **Time-Based Optimization**: Uses configurable sustain_time (1-8 seconds, default: 8)
 - **Accuracy Focus**: Selects optimal file size that provides reliable measurements
 - **Multi-Provider Support**: Tests against geographically distributed endpoints
 
@@ -210,7 +210,9 @@ File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 5MB, 10MB, 20MB, 40MB, 50MB, 100MB
 - **Base Test Duration**: 8.0 seconds
 - **Additional Buffer**: 4.0 seconds
 - **Maximum File Size**: Configurable (default: 100MB)
+- **Latency Samples**: 10 measurements, reports minimum (configurable)
 - **Jitter Samples**: 5 measurements (configurable)
+- **Sustain Time**: 1-8 seconds (configurable, default: 8)
 
 ## Troubleshooting
 
