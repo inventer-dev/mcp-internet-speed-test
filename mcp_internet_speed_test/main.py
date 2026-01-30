@@ -758,8 +758,8 @@ async def measure_jitter(
 
     async with httpx.AsyncClient() as client:
         for sample_index in range(samples):
-            msg = f"Sample {sample_index + 1}/{samples}"
-            await safe_report_progress(context, sample_index + 1, samples, msg)
+            message = f"Sample {sample_index + 1}/{samples}"
+            await safe_report_progress(context, sample_index + 1, samples, message)
             start = time.time()
             response = await client.get(url)
             end = time.time()
