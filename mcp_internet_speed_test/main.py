@@ -123,7 +123,9 @@ UPLOAD_SIZES = {
 }
 
 # Maximum time threshold for a test (in seconds)
-BASE_TEST_DURATION = 8.0
+DEFAULT_TEST_DURATION = 8.0
+MIN_TEST_DURATION = 1.0
+MAX_TEST_DURATION = 8.0
 ADDITIONAL_TEST_DURATION = 4.0
 
 # Size progression order
@@ -493,6 +495,7 @@ def extract_server_info(headers: dict[str, str]) -> dict[str, str | None]:
 @mcp.tool(icons=[ICON_DOWNLOAD])
 async def measure_download_speed(
     size_limit: str = "100MB",
+    sustain_time: int = 8,
     context: Context[ServerSession, None] = None,
 ) -> dict:
     """
@@ -500,10 +503,13 @@ async def measure_download_speed(
 
     Args:
         size_limit: Maximum file size to test (default: 100MB)
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Dictionary with download speed results
     """
+    # Validate sustain_time
+    sustain_time = max(MIN_TEST_DURATION, min(MAX_TEST_DURATION, float(sustain_time)))
     results = []
     final_result = None
 
@@ -526,9 +532,9 @@ async def measure_download_speed(
             progress_message = f"Testing {size_key} file..."
             await safe_report_progress(context, current_step, total_steps, progress_message)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
             else:
-                test_duration = BASE_TEST_DURATION
+                test_duration = sustain_time
 
             url = DEFAULT_DOWNLOAD_URLS[size_key]
             start = time.time()
@@ -587,6 +593,7 @@ async def measure_download_speed(
 async def measure_upload_speed(
     url_upload: str = DEFAULT_UPLOAD_URL,
     size_limit: str = "100MB",
+    sustain_time: int = 8,
     context: Context[ServerSession, None] = None,
 ) -> dict:
     """
@@ -595,10 +602,13 @@ async def measure_upload_speed(
     Args:
         url_upload: URL to upload data to
         size_limit: Maximum file size to test (default: 100MB)
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Dictionary with upload speed results
     """
+    # Validate sustain_time
+    sustain_time = max(MIN_TEST_DURATION, min(MAX_TEST_DURATION, float(sustain_time)))
     results = []
     final_result = None
 
@@ -621,9 +631,9 @@ async def measure_upload_speed(
             progress_message = f"Uploading {size_key} data..."
             await safe_report_progress(context, current_step, total_steps, progress_message)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
             else:
-                test_duration = BASE_TEST_DURATION
+                test_duration = sustain_time
 
             data_size = UPLOAD_SIZES[size_key]
             data = b"x" * data_size
@@ -824,6 +834,7 @@ async def run_complete_test(
     max_size: str = "100MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
+    sustain_time: int = 8,
     context: Context[ServerSession, None] = None,
 ) -> dict:
     """
@@ -839,6 +850,7 @@ async def run_complete_test(
         max_size: Maximum file size to test (default: 100MB)
         url_upload: URL for upload testing
         url_latency: URL for latency testing
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Complete test results including download, upload, latency and jitter metrics
@@ -846,11 +858,11 @@ async def run_complete_test(
     await safe_log_info(context, "Starting complete speed test...")
     await safe_report_progress(context, 1, 4, "Testing download speed...")
 
-    download_result = await measure_download_speed(max_size, context)
+    download_result = await measure_download_speed(max_size, sustain_time, context)
 
     await safe_report_progress(context, 2, 4, "Testing upload speed...")
 
-    upload_result = await measure_upload_speed(url_upload, max_size, context)
+    upload_result = await measure_upload_speed(url_upload, max_size, sustain_time, context)
 
     await safe_report_progress(context, 3, 4, "Measuring latency...")
 
