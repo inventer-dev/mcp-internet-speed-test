@@ -9,3 +9,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Linter cache
+.ruff_cache/

@@ -1,5 +1,4 @@
 [![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/inventer-dev/mcp-internet-speed-test)](https://archestra.ai/mcp-catalog/inventer-dev__mcp-internet-speed-test)
-[![smithery badge](https://smithery.ai/badge/@inventer-dev/mcp-internet-speed-test)](https://smithery.ai/server/@inventer-dev/mcp-internet-speed-test)
 
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/inventer-dev-mcp-internet-speed-test-badge.png)](https://mseep.ai/app/inventer-dev-mcp-internet-speed-test)
 
@@ -93,7 +92,7 @@ uv run python -m mcp_internet_speed_test.main
 ### Dependencies
 
 The package automatically installs these dependencies:
-- `mcp[cli]>=1.6.0`: MCP server framework with CLI integration
+- `mcp[cli]>=1.25.0`: MCP server framework with CLI integration
 - `httpx>=0.27.0`: Async HTTP client for speed tests
 
 
@@ -221,7 +220,7 @@ File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 5MB, 10MB, 20MB, 40MB, 50MB, 100MB
 1. **Path Configuration**: Ensure absolute path is used in MCP configuration
 2. **Directory Permissions**: Verify read/execute permissions for the project directory
 3. **Python Version**: Requires Python 3.12+ with async support
-4. **Dependencies**: Install `fastmcp` and `httpx` packages
+4. **Dependencies**: Install `mcp[cli]` and `httpx` packages
 
 #### Speed Test Issues
 1. **GitHub Repository Access**: Ensure `inventer-dev/speed-test-files` is accessible
@@ -295,3 +294,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - MCP Framework maintainers for standardizing AI tool interactions
 - The Model Context Protocol community for documentation and examples
+- [SpeedOf.Me](https://speedof.me) team for their incremental testing methodology. For the official SpeedOf.Me MCP server, see [@speedofme/mcp](https://www.npmjs.com/package/@speedofme/mcp)

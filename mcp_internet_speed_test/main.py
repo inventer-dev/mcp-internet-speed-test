@@ -33,20 +33,20 @@ from mcp.server.fastmcp import Context, FastMCP, Icon
 from mcp.server.session import ServerSession
 
 
-async def safe_report_progress(ctx, progress: int, total: int, message: str) -> None:
+async def safe_report_progress(context, progress: int, total: int, message: str) -> None:
     """Safely report progress, handling cases where context is unavailable."""
-    if ctx is None:
+    if context is None:
         return
     with contextlib.suppress(ValueError, AttributeError):
-        await ctx.report_progress(progress=progress, total=total, message=message)
+        await context.report_progress(progress=progress, total=total, message=message)
 
 
-async def safe_log_info(ctx, message: str) -> None:
+async def safe_log_info(context, log_message: str) -> None:
     """Safely log info message, handling cases where context is unavailable."""
-    if ctx is None:
+    if context is None:
         return
     with contextlib.suppress(ValueError, AttributeError):
-        await ctx.info(message)
+        await context.info(log_message)
 
 # Create a singleton instance of FastMCP
 mcp = FastMCP("internet_speed_test", dependencies=["httpx"])
@@ -123,7 +123,9 @@ UPLOAD_SIZES = {
 }
 
 # Maximum time threshold for a test (in seconds)
-BASE_TEST_DURATION = 8.0
+DEFAULT_TEST_DURATION = 8.0
+MIN_TEST_DURATION = 1.0
+MAX_TEST_DURATION = 8.0
 ADDITIONAL_TEST_DURATION = 4.0
 
 # Size progression order
@@ -493,17 +495,21 @@ def extract_server_info(headers: dict[str, str]) -> dict[str, str | None]:
 @mcp.tool(icons=[ICON_DOWNLOAD])
 async def measure_download_speed(
     size_limit: str = "100MB",
-    ctx: Context[ServerSession, None] = None,
+    sustain_time: int = 8,
+    context: Context[ServerSession, None] = None,
 ) -> dict:
     """
     Measure download speed using incremental file sizes.
 
     Args:
         size_limit: Maximum file size to test (default: 100MB)
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Dictionary with download speed results
     """
+    # Validate sustain_time
+    sustain_time = max(MIN_TEST_DURATION, min(MAX_TEST_DURATION, float(sustain_time)))
     results = []
     final_result = None
 
@@ -517,18 +523,18 @@ async def measure_download_speed(
     total_steps = max_index + 1
     current_step = 0
 
-    await safe_log_info(ctx, "Starting download speed test...")
+    await safe_log_info(context, "Starting download speed test...")
 
     # Test each file size in order, up to the specified limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
             current_step += 1
-            msg = f"Testing {size_key} file..."
-            await safe_report_progress(ctx, current_step, total_steps, msg)
+            progress_message = f"Testing {size_key} file..."
+            await safe_report_progress(context, current_step, total_steps, progress_message)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
             else:
-                test_duration = BASE_TEST_DURATION
+                test_duration = sustain_time
 
             url = DEFAULT_DOWNLOAD_URLS[size_key]
             start = time.time()
@@ -587,7 +593,8 @@ async def measure_download_speed(
 async def measure_upload_speed(
     url_upload: str = DEFAULT_UPLOAD_URL,
     size_limit: str = "100MB",
-    ctx: Context[ServerSession, None] = None,
+    sustain_time: int = 8,
+    context: Context[ServerSession, None] = None,
 ) -> dict:
     """
     Measure upload speed using incremental file sizes.
@@ -595,10 +602,13 @@ async def measure_upload_speed(
     Args:
         url_upload: URL to upload data to
         size_limit: Maximum file size to test (default: 100MB)
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Dictionary with upload speed results
     """
+    # Validate sustain_time
+    sustain_time = max(MIN_TEST_DURATION, min(MAX_TEST_DURATION, float(sustain_time)))
     results = []
     final_result = None
 
@@ -612,18 +622,18 @@ async def measure_upload_speed(
     total_steps = max_index + 1
     current_step = 0
 
-    await safe_log_info(ctx, "Starting upload speed test...")
+    await safe_log_info(context, "Starting upload speed test...")
 
     # Only test up to the specified size limit
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
             current_step += 1
-            msg = f"Uploading {size_key} data..."
-            await safe_report_progress(ctx, current_step, total_steps, msg)
+            progress_message = f"Uploading {size_key} data..."
+            await safe_report_progress(context, current_step, total_steps, progress_message)
             if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = BASE_TEST_DURATION + ADDITIONAL_TEST_DURATION
+                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
             else:
-                test_duration = BASE_TEST_DURATION
+                test_duration = sustain_time
 
             data_size = UPLOAD_SIZES[size_key]
             data = b"x" * data_size
@@ -693,28 +703,43 @@ async def measure_upload_speed(
 
 
 @mcp.tool(icons=[ICON_LATENCY])
-async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
-    """Measure the latency
+async def measure_latency(
+    url: str = DEFAULT_LATENCY_URL,
+    samples: int = 10,
+) -> dict:
+    """Measure the latency using multiple samples and report the minimum.
+
+    Takes a number of samples and reports the lowest
+    value for the most accurate representation of network latency.
 
     Args:
         url (str): The URL to measure latency to
+        samples (int): Number of samples to take (default: 10)
 
     Returns:
-        Dictionary with latency result
+        Dictionary with latency result (minimum of all samples)
     """
-    start = time.time()
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-    end = time.time()
-    elapsed_time = end - start
+    latency_values = []
+    server_info = None
 
-    # Extract server information from headers
-    server_info = extract_server_info(dict(response.headers))
+    async with httpx.AsyncClient() as client:
+        for sample_index in range(samples):
+            start = time.time()
+            response = await client.get(url)
+            end = time.time()
+            latency_values.append((end - start) * 1000)
+
+            if sample_index == 0:
+                server_info = extract_server_info(dict(response.headers))
 
     return {
-        "latency": round(elapsed_time * 1000, 2),  # Convert to milliseconds
+        "latency": round(min(latency_values), 2),
         "unit": "ms",
         "url": url,
+        "samples": samples,
+        "min_latency": round(min(latency_values), 2),
+        "max_latency": round(max(latency_values), 2),
+        "avg_latency": round(sum(latency_values) / len(latency_values), 2),
         "server_info": server_info,
     }
 
@@ -723,24 +748,25 @@ async def measure_latency(url: str = DEFAULT_LATENCY_URL) -> dict:
 async def measure_jitter(
     url: str = DEFAULT_LATENCY_URL,
     samples: int = 5,
-    ctx: Context[ServerSession, None] = None,
+    context: Context[ServerSession, None] = None,
 ) -> dict:
     """Jitter is the variation in latency, so we need multiple measurements."""
     latency_values = []
     server_info = None
 
-    await safe_log_info(ctx, f"Starting jitter measurement with {samples} samples...")
+    await safe_log_info(context, f"Starting jitter measurement with {samples} samples...")
 
     async with httpx.AsyncClient() as client:
-        for i in range(samples):
-            await safe_report_progress(ctx, i + 1, samples, f"Sample {i + 1}/{samples}")
+        for sample_index in range(samples):
+            msg = f"Sample {sample_index + 1}/{samples}"
+            await safe_report_progress(context, sample_index + 1, samples, msg)
             start = time.time()
             response = await client.get(url)
             end = time.time()
             latency_values.append((end - start) * 1000)  # Convert to milliseconds
 
             # Extract server info from the first response
-            if i == 0:
+            if sample_index == 0:
                 server_info = extract_server_info(dict(response.headers))
 
     # Calculate average latency
@@ -824,7 +850,8 @@ async def run_complete_test(
     max_size: str = "100MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
-    ctx: Context[ServerSession, None] = None,
+    sustain_time: int = 8,
+    context: Context[ServerSession, None] = None,
 ) -> dict:
     """
     Run a complete speed test returning all metrics in a single call.
@@ -839,28 +866,29 @@ async def run_complete_test(
         max_size: Maximum file size to test (default: 100MB)
         url_upload: URL for upload testing
         url_latency: URL for latency testing
+        sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
         Complete test results including download, upload, latency and jitter metrics
     """
-    await safe_log_info(ctx, "Starting complete speed test...")
-    await safe_report_progress(ctx, 1, 4, "Testing download speed...")
+    await safe_log_info(context, "Starting complete speed test...")
+    await safe_report_progress(context, 1, 4, "Testing download speed...")
 
-    download_result = await measure_download_speed(max_size, ctx)
+    download_result = await measure_download_speed(max_size, sustain_time, context)
 
-    await safe_report_progress(ctx, 2, 4, "Testing upload speed...")
+    await safe_report_progress(context, 2, 4, "Testing upload speed...")
 
-    upload_result = await measure_upload_speed(url_upload, max_size, ctx)
+    upload_result = await measure_upload_speed(url_upload, max_size, sustain_time, context)
 
-    await safe_report_progress(ctx, 3, 4, "Measuring latency...")
+    await safe_report_progress(context, 3, 4, "Measuring latency...")
 
     latency_result = await measure_latency(url_latency)
 
-    await safe_report_progress(ctx, 4, 4, "Measuring jitter...")
+    await safe_report_progress(context, 4, 4, "Measuring jitter...")
 
-    jitter_result = await measure_jitter(url_latency, 5, ctx)
+    jitter_result = await measure_jitter(url_latency, 5, context)
 
-    await safe_log_info(ctx, "Complete speed test finished!")
+    await safe_log_info(context, "Complete speed test finished!")
 
     return {
         "timestamp": time.time(),
