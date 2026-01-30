@@ -294,3 +294,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - MCP Framework maintainers for standardizing AI tool interactions
 - The Model Context Protocol community for documentation and examples
+- [SpeedOf.Me](https://speedof.me) team for their incremental testing methodology. For the official SpeedOf.Me MCP server, see [@speedofme/mcp](https://www.npmjs.com/package/@speedofme/mcp)
