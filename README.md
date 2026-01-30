@@ -92,7 +92,7 @@ uv run python -m mcp_internet_speed_test.main
 ### Dependencies
 
 The package automatically installs these dependencies:
-- `mcp[cli]>=1.6.0`: MCP server framework with CLI integration
+- `mcp[cli]>=1.25.0`: MCP server framework with CLI integration
 - `httpx>=0.27.0`: Async HTTP client for speed tests
 
 
@@ -220,7 +220,7 @@ File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 5MB, 10MB, 20MB, 40MB, 50MB, 100MB
 1. **Path Configuration**: Ensure absolute path is used in MCP configuration
 2. **Directory Permissions**: Verify read/execute permissions for the project directory
 3. **Python Version**: Requires Python 3.12+ with async support
-4. **Dependencies**: Install `fastmcp` and `httpx` packages
+4. **Dependencies**: Install `mcp[cli]` and `httpx` packages
 
 #### Speed Test Issues
 1. **GitHub Repository Access**: Ensure `inventer-dev/speed-test-files` is accessible
