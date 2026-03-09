@@ -24,9 +24,9 @@ The Model Context Protocol (MCP) provides a standardized way for Large Language 
 
 ## Features
 
-- **Smart Incremental Testing**: Uses SpeedOf.Me methodology with 8-second threshold for optimal accuracy
-- **Download Speed Testing**: Measures bandwidth using files from 128KB to 100MB from GitHub repository
-- **Upload Speed Testing**: Tests upload bandwidth using generated data from 128KB to 100MB
+- **Smart Incremental Testing**: Uses [SpeedOf.Me methodology](#speedofme-testing-methodology) with 8-second threshold for optimal accuracy
+- **Download Speed Testing**: Measures bandwidth using files from 128KB to 128MB from GitHub repository (Git LFS)
+- **Upload Speed Testing**: Tests upload bandwidth using streaming data from 128KB to 128MB
 - **Latency Testing**: Measures network latency using multiple samples, reports minimum value
 - **Jitter Analysis**: Calculates network stability using multiple latency samples (default: 5)
 - **Multi-CDN Support**: Detects and provides info for Fastly, Cloudflare, and AWS CloudFront
@@ -155,10 +155,11 @@ This speed test now provides detailed information about the CDN servers serving 
 ### Technical Implementation
 
 #### Smart Testing Methodology
-- **Incremental Approach**: Starts with small files (128KB) and progressively increases
-- **Time-Based Optimization**: Uses configurable sustain_time (1-8 seconds, default: 8) + 4-second additional buffer
-- **Accuracy Focus**: Selects optimal file size that provides reliable measurements
+- **Incremental Approach**: Starts with small files (128KB) and progressively increases (powers of 2)
+- **Time-Based Threshold**: Uses configurable sustain_time (1-8 seconds, default: 8). Stops when a sample exceeds the threshold
+- **Accuracy Focus**: The speed from the last sample that took ≥ 8 seconds is used as the final measurement
 - **Multi-Provider Support**: Tests against geographically distributed endpoints
+- **Full methodology**: See [SpeedOf.Me Testing Methodology](#speedofme-testing-methodology)
 
 #### CDN Detection Capabilities
 - **Fastly**: Detects POP codes and maps to 50+ global locations
@@ -191,7 +192,9 @@ This speed test now provides detailed information about the CDN servers serving 
 ```
 GitHub Repository: inventer-dev/speed-test-files
 Branch: main
-File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 5MB, 10MB, 20MB, 40MB, 50MB, 100MB
+URL: https://media.githubusercontent.com/media/inventer-dev/speed-test-files/main/
+File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 4MB, 8MB, 16MB, 32MB, 64MB, 128MB
+Storage: Git LFS
 ```
 
 #### Upload Endpoints Priority
@@ -207,9 +210,8 @@ File Sizes: 128KB, 256KB, 512KB, 1MB, 2MB, 5MB, 10MB, 20MB, 40MB, 50MB, 100MB
 **AWS CloudFront**: ATL, BOS, ORD, CMH, DFW, DEN, IAD, LAX, MIA, MSP, JFK, SEA, SJC, AMS, ATH, TXL...
 
 #### Performance Thresholds
-- **Base Test Duration**: 8.0 seconds
-- **Additional Buffer**: 4.0 seconds
-- **Maximum File Size**: Configurable (default: 100MB)
+- **Test Duration Threshold**: 8.0 seconds (stops when a sample exceeds this)
+- **Maximum File Size**: Configurable (default: 128MB)
 - **Latency Samples**: 10 measurements, reports minimum (configurable)
 - **Jitter Samples**: 5 measurements (configurable)
 - **Sustain Time**: 1-8 seconds (configurable, default: 8)
@@ -243,7 +245,7 @@ mcp-internet-speed-test/
 ├── mcp_internet_speed_test/  # Main package directory
 │   ├── __init__.py      # Package initialization
 │   └── main.py          # MCP server implementation
-├── README.md           # This documentation
+├── README.md           # This documentation (includes methodology reference)
 ├── Dockerfile          # Container configuration
 └── pyproject.toml      # Python project configuration
 ```
@@ -251,9 +253,9 @@ mcp-internet-speed-test/
 ### Key Components
 
 #### Configuration Constants
-- `GITHUB_RAW_URL`: Base URL for test files repository
+- `GITHUB_MEDIA_URL`: Base URL for test files repository (Git LFS media endpoint)
 - `UPLOAD_ENDPOINTS`: Prioritized list of upload test endpoints
-- `SIZE_PROGRESSION`: Ordered list of file sizes for incremental testing
+- `SIZE_PROGRESSION`: Ordered list of file sizes for incremental testing (powers of 2)
 - `*_POP_LOCATIONS`: Mappings of CDN codes to geographic locations
 
 #### Core Functions
@@ -270,9 +272,8 @@ GITHUB_USERNAME = "your-username"
 GITHUB_REPO = "your-speed-test-files"
 GITHUB_BRANCH = "main"
 
-# Test duration thresholds
-BASE_TEST_DURATION = 8.0  # seconds
-ADDITIONAL_TEST_DURATION = 4.0  # seconds
+# Test duration threshold
+DEFAULT_TEST_DURATION = 8.0  # seconds
 
 # Default endpoints
 DEFAULT_UPLOAD_URL = "your-upload-endpoint"
@@ -296,4 +297,118 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - MCP Framework maintainers for standardizing AI tool interactions
 - The Model Context Protocol community for documentation and examples
-- [SpeedOf.Me](https://speedof.me) team for their incremental testing methodology. For the official SpeedOf.Me MCP server, see [@speedofme/mcp](https://www.npmjs.com/package/@speedofme/mcp)
+- [SpeedOf.Me](https://speedof.me) team for their incremental testing methodology ([How It Works](https://speedof.me/howitworks.html)). See [methodology reference below](#speedofme-testing-methodology)
+- For the official SpeedOf.Me MCP server, see [@speedofme/mcp](https://www.npmjs.com/package/@speedofme/mcp)
+
+---
+
+## SpeedOf.Me Testing Methodology
+
+> **Source:** [SpeedOf.Me — How It Works](https://speedof.me/howitworks.html)
+>
+> This section preserves the SpeedOf.Me testing methodology as referenced
+> by this project. Retrieved on March 8, 2026.
+
+<details>
+<summary><strong>Click to expand full methodology</strong></summary>
+
+### Overview
+
+SpeedOf.Me tests an internet connection by downloading and uploading sample
+files. It reflects actual browsing and download performance by using a single
+HTTP connection and large continuous files — the same way real web content is
+delivered.
+
+### Download Test
+
+1. Begin by downloading the **smallest sample size** (128 KB).
+2. Measure the download duration in real time.
+3. If the download takes **less than 8 seconds**, move to the **next larger
+   sample size**.
+4. If the download takes **8 seconds or more**, stop the progression.
+5. The **final speed measurement** is based on **that last sample** — the one
+   that took 8 seconds or more.
+
+### Upload Test
+
+When the download test is complete, a similar incremental process is used to
+send data back to the test server:
+
+1. Start with a **small sample** and gradually increase in size.
+2. Continue until uploading a sample takes **more than 8 seconds**.
+3. The upload speed is based on that final sample.
+
+### Latency & Jitter
+
+- **Latency (ping):** The time it takes for data to travel to the server and
+  back. Measured over **10 samples** with the **lowest value reported**.
+- **Jitter:** The variation between latency samples. Lower jitter means a more
+  stable connection, which is important for video calls and gaming.
+
+### Adaptive Testing Method
+
+To ensure the internet connection is thoroughly tested, bandwidth is measured in
+**several passes**. Sample file sizes gradually increase until one takes longer
+than 8 seconds to download.
+
+This approach automatically measures connection speeds ranging from very slow
+mobile networks (10 Kbps GPRS / 2G) to gigabit fiber connections (1 Gbps or
+more).
+
+#### Sample File Sizes
+
+| # | Size   |
+|---|--------|
+| 1 | 128 KB |
+| 2 | 256 KB |
+| 3 | 512 KB |
+| 4 | 1 MB   |
+| 5 | 2 MB   |
+| 6 | 4 MB   |
+| 7 | 8 MB   |
+| 8 | 16 MB  |
+| 9 | 32 MB  |
+| 10 | 64 MB |
+| 11 | 128 MB |
+
+### Test Servers
+
+SpeedOf.Me hosts its sample files on a
+[CDN](https://en.wikipedia.org/wiki/Content_delivery_network). It uses servers
+called [PoPs](https://en.wikipedia.org/wiki/Points_of_presence) (Points of
+Presence) in **106+ cities**. Each PoP may consist of multiple servers and is
+located in key regions around the world, near major internet exchange points.
+
+When the test begins, SpeedOf.Me **automatically selects the most reliable and
+responsive server**. This may not be the closest one — several factors are taken
+into account to determine the best option. CDN technology handles this process
+to provide the most accurate and consistent test results.
+
+### Accuracy
+
+Key differences that make this methodology accurate:
+
+1. **Single continuous download** — Downloads large, continuous sample files,
+   similar to how web pages or media files are typically delivered. Other speed
+   tests use small chunks transferred in parallel and apply adjustments to
+   estimate speed.
+2. **Multiple global servers** — Uses PoPs in different regions, producing more
+   realistic results. Other services often choose the nearest physical server
+   (sometimes inside the ISP network), which can give inflated results.
+3. **No plugins required** — Tests run directly from the client with no extra
+   software.
+
+### How This Project Implements the Methodology
+
+| SpeedOf.Me Concept | Implementation in this project |
+|--------------------|-------------------------------|
+| Incremental download | `measure_download_speed()` iterates `SIZE_PROGRESSION`, breaks when elapsed ≥ `sustain_time` (default 8 s) |
+| Incremental upload | `measure_upload_speed()` streams chunks and breaks when elapsed ≥ `sustain_time` |
+| 8-second threshold | Configurable via `sustain_time` parameter (1–8 s, default 8) |
+| Latency — 10 samples, min | `measure_latency(samples=10)` reports `min_latency` |
+| Jitter — variation | `measure_jitter(samples=5)` reports average deviation from mean |
+| CDN with PoPs | Download files served from GitHub via Fastly CDN; upload via Cloudflare Workers |
+| Sample file sizes (powers of 2) | 128 KB → 128 MB stored in `inventer-dev/speed-test-files` (Git LFS) |
+| Automatic server selection | CDN handles geographic routing; PoP detected from response headers |
+
+</details>

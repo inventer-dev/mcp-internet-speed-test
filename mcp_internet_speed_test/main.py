@@ -19,8 +19,8 @@ An internet speed test uses an incremental testing approach:
 
 ### Test Method
 - Tests bandwidth in several passes with gradually increasing file sizes
-- Can measure a wide range of connection speeds (from 10 Kbps to 100+ Mbps)
-- Sample files sizes range from 128 KB to 512 MB
+- Can measure a wide range of connection speeds (from 10 Kbps to 1+ Gbps)
+- Sample file sizes: 128 KB, 256 KB, 512 KB, 1 MB, 2 MB, 4 MB, 8 MB, 16 MB, 32 MB, 64 MB, 128 MB
 
 """
 
@@ -69,22 +69,23 @@ GITHUB_REPO = "speed-test-files"  # Replace with your repository name
 GITHUB_BRANCH = "main"  # Replace with your branch name (main or master)
 
 # Build base URL for GitHub raw content
-GITHUB_RAW_URL = (
-    f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/{GITHUB_BRANCH}"
+# Build base URL for GitHub media content (Git LFS)
+GITHUB_MEDIA_URL = (
+    f"https://media.githubusercontent.com/media/{GITHUB_USERNAME}/{GITHUB_REPO}/{GITHUB_BRANCH}"
 )
 
 DEFAULT_DOWNLOAD_URLS = {
-    "128KB": f"{GITHUB_RAW_URL}/128KB.bin",
-    "256KB": f"{GITHUB_RAW_URL}/256KB.bin",
-    "512KB": f"{GITHUB_RAW_URL}/512KB.bin",
-    "1MB": f"{GITHUB_RAW_URL}/1MB.bin",
-    "2MB": f"{GITHUB_RAW_URL}/2MB.bin",
-    "5MB": f"{GITHUB_RAW_URL}/5MB.bin",
-    "10MB": f"{GITHUB_RAW_URL}/10MB.bin",
-    "20MB": f"{GITHUB_RAW_URL}/20MB.bin",
-    "40MB": f"{GITHUB_RAW_URL}/40MB.bin",
-    "50MB": f"{GITHUB_RAW_URL}/50MB.bin",
-    "100MB": f"{GITHUB_RAW_URL}/100MB.bin",
+    "128KB": f"{GITHUB_MEDIA_URL}/128KB.bin",
+    "256KB": f"{GITHUB_MEDIA_URL}/256KB.bin",
+    "512KB": f"{GITHUB_MEDIA_URL}/512KB.bin",
+    "1MB": f"{GITHUB_MEDIA_URL}/1MB.bin",
+    "2MB": f"{GITHUB_MEDIA_URL}/2MB.bin",
+    "4MB": f"{GITHUB_MEDIA_URL}/4MB.bin",
+    "8MB": f"{GITHUB_MEDIA_URL}/8MB.bin",
+    "16MB": f"{GITHUB_MEDIA_URL}/16MB.bin",
+    "32MB": f"{GITHUB_MEDIA_URL}/32MB.bin",
+    "64MB": f"{GITHUB_MEDIA_URL}/64MB.bin",
+    "128MB": f"{GITHUB_MEDIA_URL}/128MB.bin",
 }
 
 # Distributed upload endpoints for geographic diversity
@@ -114,19 +115,18 @@ UPLOAD_SIZES = {
     "512KB": 512 * 1024,
     "1MB": 1 * 1024 * 1024,
     "2MB": 2 * 1024 * 1024,
-    "5MB": 5 * 1024 * 1024,
-    "10MB": 10 * 1024 * 1024,
-    "20MB": 20 * 1024 * 1024,
-    "40MB": 40 * 1024 * 1024,
-    "50MB": 50 * 1024 * 1024,
-    "100MB": 100 * 1024 * 1024,
+    "4MB": 4 * 1024 * 1024,
+    "8MB": 8 * 1024 * 1024,
+    "16MB": 16 * 1024 * 1024,
+    "32MB": 32 * 1024 * 1024,
+    "64MB": 64 * 1024 * 1024,
+    "128MB": 128 * 1024 * 1024,
 }
 
 # Maximum time threshold for a test (in seconds)
 DEFAULT_TEST_DURATION = 8.0
 MIN_TEST_DURATION = 1.0
 MAX_TEST_DURATION = 8.0
-ADDITIONAL_TEST_DURATION = 4.0
 
 # Size progression order
 SIZE_PROGRESSION = [
@@ -135,12 +135,12 @@ SIZE_PROGRESSION = [
     "512KB",
     "1MB",
     "2MB",
-    "5MB",
-    "10MB",
-    "20MB",
-    "40MB",
-    "50MB",
-    "100MB",
+    "4MB",
+    "8MB",
+    "16MB",
+    "32MB",
+    "64MB",
+    "128MB",
 ]
 
 # Server location mapping based on Fastly POP codes
@@ -494,7 +494,7 @@ def extract_server_info(headers: dict[str, str]) -> dict[str, str | None]:
 # Register tools
 @mcp.tool(icons=[ICON_DOWNLOAD])
 async def measure_download_speed(
-    size_limit: str = "100MB",
+    size_limit: str = "128MB",
     sustain_time: int = 8,
     context: Context[ServerSession, None] = None,
 ) -> dict:
@@ -502,7 +502,7 @@ async def measure_download_speed(
     Measure download speed using incremental file sizes.
 
     Args:
-        size_limit: Maximum file size to test (default: 100MB)
+        size_limit: Maximum file size to test (default: 128MB)
         sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
@@ -526,19 +526,18 @@ async def measure_download_speed(
     await safe_log_info(context, "Starting download speed test...")
 
     # Test each file size in order, up to the specified limit
+    # Methodology: download each size, if it takes < 8s move to next,
+    # if it takes >= 8s use that result as final and stop.
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
             current_step += 1
             progress_message = f"Testing {size_key} file..."
             await safe_report_progress(context, current_step, total_steps, progress_message)
-            if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
-            else:
-                test_duration = sustain_time
 
             url = DEFAULT_DOWNLOAD_URLS[size_key]
             start = time.time()
             total_size = 0
+            current_result = None
 
             async with client.stream(
                 "GET",
@@ -549,16 +548,14 @@ async def measure_download_speed(
 
                 async for chunk in response.aiter_bytes(chunk_size=1024):
                     if chunk:
-                        chunk_size = len(chunk)
-                        total_size += chunk_size
+                        total_size += len(chunk)
 
                         # Check elapsed time during download
-                        current_time = time.time()
-                        elapsed_time = current_time - start
+                        elapsed_time = time.time() - start
 
-                        # Update our final result continuously
+                        # Update current result continuously
                         speed_mbps = ((total_size * 8) / (1024 * 1024)) / elapsed_time
-                        final_result = {
+                        current_result = {
                             "download_speed": round(speed_mbps, 2),
                             "elapsed_time": round(elapsed_time, 2),
                             "data_size": total_size,
@@ -567,9 +564,28 @@ async def measure_download_speed(
                             "server_info": server_info,
                         }
 
-                        # If test duration exceeded, stop the test
-                        if elapsed_time >= test_duration:
+                        # If test duration exceeded, stop streaming this file
+                        if elapsed_time >= sustain_time:
                             break
+
+            # Record final measurement for this file size
+            if current_result is None:
+                elapsed_time = time.time() - start
+                current_result = {
+                    "download_speed": 0,
+                    "elapsed_time": round(elapsed_time, 2),
+                    "data_size": total_size,
+                    "size": size_key,
+                    "url": url,
+                    "server_info": server_info if total_size > 0 else None,
+                }
+
+            results.append(current_result)
+            final_result = current_result
+
+            # If this download took >= sustain_time, we found our measurement
+            if current_result["elapsed_time"] >= sustain_time:
+                break
 
     # Return the final result or an error if all tests failed
     if final_result:
@@ -592,7 +608,7 @@ async def measure_download_speed(
 @mcp.tool(icons=[ICON_UPLOAD])
 async def measure_upload_speed(
     url_upload: str = DEFAULT_UPLOAD_URL,
-    size_limit: str = "100MB",
+    size_limit: str = "128MB",
     sustain_time: int = 8,
     context: Context[ServerSession, None] = None,
 ) -> dict:
@@ -601,7 +617,7 @@ async def measure_upload_speed(
 
     Args:
         url_upload: URL to upload data to
-        size_limit: Maximum file size to test (default: 100MB)
+        size_limit: Maximum file size to test (default: 128MB)
         sustain_time: Duration in seconds for each test (1-8, default: 8)
 
     Returns:
@@ -624,47 +640,69 @@ async def measure_upload_speed(
 
     await safe_log_info(context, "Starting upload speed test...")
 
-    # Only test up to the specified size limit
+    # Methodology: upload each size incrementally,
+    # if it takes < 8s move to next, if >= 8s use that result and stop.
+    upload_chunk_size = 64 * 1024  # 64KB chunks for streaming upload
+
     async with httpx.AsyncClient() as client:
         for size_key in SIZE_PROGRESSION[: max_index + 1]:
             current_step += 1
             progress_message = f"Uploading {size_key} data..."
             await safe_report_progress(context, current_step, total_steps, progress_message)
-            if size_key in ["100MB", "200MB", "500MB", "1GB"]:
-                test_duration = sustain_time + ADDITIONAL_TEST_DURATION
-            else:
-                test_duration = sustain_time
 
             data_size = UPLOAD_SIZES[size_key]
-            data = b"x" * data_size
+            bytes_sent = 0
             start = time.time()
+            timed_out = False
+
+            # Create a streaming generator that checks elapsed time
+            async def upload_stream():
+                nonlocal bytes_sent, timed_out
+                remaining = data_size
+                while remaining > 0:
+                    elapsed = time.time() - start
+                    if elapsed >= sustain_time:
+                        timed_out = True
+                        break
+                    chunk = min(upload_chunk_size, remaining)
+                    yield b"x" * chunk
+                    bytes_sent += chunk
+                    remaining -= chunk
 
             try:
-                response = await client.post(url_upload, data=data, timeout=30.0)
-                end = time.time()
-                elapsed_time = end - start
+                response = await client.post(
+                    url_upload,
+                    content=upload_stream(),
+                    headers={"content-type": "application/octet-stream"},
+                    timeout=httpx.Timeout(
+                        connect=10.0,
+                        read=sustain_time + 5.0,
+                        write=sustain_time + 5.0,
+                        pool=10.0,
+                    ),
+                )
+                elapsed_time = time.time() - start
 
                 # Extract server information from headers
                 server_info = extract_server_info(dict(response.headers))
 
-                # Calculate upload speed in Mbps
-                speed_mbps = (data_size * 8) / (1024 * 1024) / elapsed_time
+                # Calculate upload speed based on bytes actually sent
+                actual_size = bytes_sent if timed_out else data_size
+                speed_mbps = (actual_size * 8) / (1024 * 1024) / elapsed_time
                 result = {
                     "size": size_key,
                     "upload_speed": round(speed_mbps, 2),
                     "elapsed_time": round(elapsed_time, 2),
-                    "data_size": data_size,
+                    "data_size": actual_size,
                     "url": url_upload,
                     "server_info": server_info,
                 }
 
                 results.append(result)
-
-                # Set the final result to the last result
                 final_result = result
 
-                # If this test took longer than our threshold, we're done
-                if elapsed_time > test_duration:
+                # If this upload took >= sustain_time, we found our measurement
+                if elapsed_time >= sustain_time:
                     break
 
             except (
@@ -672,6 +710,22 @@ async def measure_upload_speed(
                 httpx.HTTPStatusError,
                 httpx.TimeoutException,
             ) as e:
+                # If we timed out but sent data, calculate speed from what we sent
+                if timed_out and bytes_sent > 0:
+                    elapsed_time = time.time() - start
+                    speed_mbps = (bytes_sent * 8) / (1024 * 1024) / elapsed_time
+                    result = {
+                        "size": size_key,
+                        "upload_speed": round(speed_mbps, 2),
+                        "elapsed_time": round(elapsed_time, 2),
+                        "data_size": bytes_sent,
+                        "url": url_upload,
+                        "server_info": None,
+                    }
+                    results.append(result)
+                    final_result = result
+                    break
+
                 results.append(
                     {
                         "size": size_key,
@@ -680,7 +734,6 @@ async def measure_upload_speed(
                         "url": url_upload,
                     },
                 )
-                # If we encounter an error, use the last successful result or continue
                 if final_result:
                     break
 
@@ -847,7 +900,7 @@ async def get_server_info(
 
 @mcp.tool(icons=[ICON_COMPLETE])
 async def run_complete_test(
-    max_size: str = "100MB",
+    max_size: str = "128MB",
     url_upload: str = DEFAULT_UPLOAD_URL,
     url_latency: str = DEFAULT_LATENCY_URL,
     sustain_time: int = 8,
@@ -863,7 +916,7 @@ async def run_complete_test(
     - Returns comprehensive results with real-time data
 
     Args:
-        max_size: Maximum file size to test (default: 100MB)
+        max_size: Maximum file size to test (default: 128MB)
         url_upload: URL for upload testing
         url_latency: URL for latency testing
         sustain_time: Duration in seconds for each test (1-8, default: 8)
